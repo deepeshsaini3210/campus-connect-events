@@ -1,0 +1,292 @@
+# Application Configuration
+server:
+  port: 8081
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: event-discovery-backend
+
+  # DevTools restart uses a separate classloader; with a multi-module build (app + service) this can
+  # cause ClassNotFoundException for beans in service (e.g. JwtTokenProvider) when creating app filters.
+  devtools:
+    restart:
+      enabled: false
+  
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/event?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Root@123}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+  
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+  
+  # Cache Configuration
+  cache:
+    type: simple
+    cache-names:
+      - events
+      - users
+      - colleges
+      - categories
+  
+  # Mail Configuration
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:deepeshsaini3210@gmil.com}
+    password: ${MAIL_PASSWORD:Aayush@123}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+    protocol: smtp
+  
+  # Redis Configuration (optional)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:mySecretKey123456789012345678901234567890}
+  expiration: ${JWT_EXPIRATION:86400000}  # 24 hours
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}  # 7 days
+
+# Swagger/OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  info:
+    title: Event Discovery and Booking API
+    description: Production-ready backend for University Event Discovery and Booking Platform
+    version: 1.0.0
+    contact:
+      name: University Events Team
+      email: support@university-events.com
+  servers:
+    - url: http://localhost:8081/api
+      description: Development server (matches server.port + context-path)
+    - url: https://api.university-events.com/api
+      description: Production server
+
+# Management/Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,env
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+    info:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  info:
+    env:
+      enabled: true
+    git:
+      mode: full
+
+# Logging Configuration
+logging:
+  level:
+    com.university.events: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.zaxxer.hikari: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/event-discovery-backend.log
+    max-size: 10MB
+    max-history: 30
+
+# Application-specific Configuration
+app:
+  # Base URL for links inside HTML emails (verify / reset). Must match where the SPA runs (Vite default 5173; TanStack on 8080, etc.).
+  frontend-base-url: ${FRONTEND_URL:http://localhost:5173}
+  # Shown in backend logs when mail is disabled — direct GET works in a browser without the SPA.
+  backend-public-url: ${BACKEND_PUBLIC_URL:http://localhost:8081/api}
+  email-verification-expiry-hours: 48
+  password-reset-expiry-hours: 2
+  # --- Email (verification + password reset) ---
+  # MAIL_ENABLED=false (default): nothing is sent over SMTP. Links are printed to the SERVER console
+  # (search logs for "VERIFICATION LINK" or "[EMAIL]").
+  #
+  # MAIL_ENABLED=true: configure real SMTP below (spring.mail.*). For Gmail:
+  #   1. Google Account → Security → 2-Step Verification ON → App passwords → generate "Mail".
+  #   2. Export: MAIL_ENABLED=true MAIL_USERNAME=you@gmail.com MAIL_PASSWORD=xxxx MAIL_FROM=you@gmail.com
+  #   3. MAIL_FROM should match MAIL_USERNAME for Gmail.
+  #   4. Set FRONTEND_URL to your app origin (e.g. http://localhost:8080) so links in the email open the right host.
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:noreply@localhost}
+
+  security:
+    allowed-origins:
+      - http://localhost:3000
+      - http://localhost:5173
+      - http://localhost:8080
+      - https://university-events-frontend.com
+    cors:
+      enabled: true
+      max-age: 3600
+  
+  file:
+    upload:
+      path: ${FILE_UPLOAD_PATH:./uploads}
+      max-size: 10MB
+      allowed-types: jpg,jpeg,png,pdf,doc,docx
+  
+  email:
+    verification:
+      expiration: 86400000  # 24 hours
+    password-reset:
+      expiration: 3600000   # 1 hour
+  
+  qr:
+    base-url: ${QR_BASE_URL:https://university-events.com/verify}
+    width: 200
+    height: 200
+  
+  pagination:
+    default-size: 20
+    max-size: 100
+
+# MinIO (S3-compatible) — event poster uploads via POST /v1/events/images
+# Run MinIO locally: docker run -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+minio:
+  enabled: ${MINIO_ENABLED:true}
+  endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket: ${MINIO_BUCKET:event-images}
+  # Leave empty to build URLs as {endpoint}/{bucket}/{objectKey}
+  public-base-url: ${MINIO_PUBLIC_BASE_URL:}
+
+---
+# Development Profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+logging:
+  level:
+    com.university.events: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+
+---
+# Test Profile
+spring:
+  config:
+    activate:
+      on-profile: test
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+
+logging:
+  level:
+    com.university.events: INFO
+    org.springframework.security: INFO
+
+---
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+
+logging:
+  level:
+    com.university.events: INFO
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+  file:
+    name: /var/log/event-discovery-backend/application.log

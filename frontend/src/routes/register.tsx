@@ -1,0 +1,195 @@
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { authService } from "@/lib/api/auth";
+
+export const Route = createFileRoute("/register")({
+  component: RegisterPage,
+});
+
+/** Matches Spring `RegisterRequest`: roleId + optional collegeId */
+const ROLE_OPTIONS = [
+  { id: 1, label: "Student" },
+  { id: 2, label: "College Admin" },
+  { id: 3, label: "Event Organizer" },
+  { id: 4, label: "External Partner" },
+  { id: 5, label: "Super Admin" },
+] as const;
+
+const COLLEGE_OPTIONS = [
+  { id: 1, name: "Mandsaur University" },
+  { id: 2, name: "IIT Indore" },
+  { id: 3, name: "DAVV Indore" },
+  { id: 4, name: "IIM Indore" },
+  { id: 5, name: "MITS Gwalior" },
+  { id: 6, name: "SGSITS Indore" },
+  { id: 7, name: "Medi-Caps University" },
+] as const;
+
+function RegisterPage() {
+  const navigate = useNavigate();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [roleId, setRoleId] = useState<number>(1);
+  const [collegeId, setCollegeId] = useState<number>(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await authService.register({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        password,
+        phone: phone.trim() || undefined,
+        roleId,
+        collegeId,
+      });
+      if (res.success && res.data) {
+        navigate({
+          to: "/verify-email",
+          search: { registered: "1" },
+        });
+        return;
+      }
+      setError(res.message || "Registration failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AuthShell
+      title="Sign up"
+      subtitle="Create your MU Events account. You’ll confirm your email before full access — check the server logs for the link in development."
+    >
+      <div className="bg-card border border-border rounded-2xl shadow-card p-6 sm:p-8">
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First name</Label>
+              <Input
+                id="firstName"
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last name</Label>
+              <Input
+                id="lastName"
+                required
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="h-11"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="reg-email">Email</Label>
+            <Input
+              id="reg-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-11"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone (optional, 10 digits)</Label>
+            <Input
+              id="phone"
+              inputMode="numeric"
+              placeholder="9876543210"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="h-11"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="reg-password">Password</Label>
+            <Input
+              id="reg-password"
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Strong password"
+              className="h-11"
+            />
+            <p className="text-xs text-muted-foreground">
+              Upper & lower case, a number, and a special character (@$!%*?&). Minimum 8 characters.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <select
+                id="role"
+                className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={roleId}
+                onChange={(e) => setRoleId(Number(e.target.value))}
+              >
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="college">College</Label>
+              <select
+                id="college"
+                className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={collegeId}
+                onChange={(e) => setCollegeId(Number(e.target.value))}
+              >
+                {COLLEGE_OPTIONS.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+          <Button type="submit" className="w-full h-11 font-semibold" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating account…
+              </>
+            ) : (
+              "Sign up"
+            )}
+          </Button>
+        </form>
+
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          Already registered?{" "}
+          <Link to="/login" className="text-primary font-semibold hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </AuthShell>
+  );
+}
