@@ -71,4 +71,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     
     @Query("SELECT e FROM Event e WHERE e.deadline < :currentDate AND e.status = 'APPROVED'")
     List<Event> findEventsWithExpiredDeadline(@Param("currentDate") LocalDate currentDate);
+
+    @Query("SELECT e FROM Event e WHERE e.eventDate = :today AND e.status IN ('APPROVED', 'COMPLETED') ORDER BY e.eventTime ASC")
+    List<Event> findTodayEvents(@Param("today") LocalDate today);
 }

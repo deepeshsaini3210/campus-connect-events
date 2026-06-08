@@ -23,7 +23,7 @@ public class UserMapperImpl implements UserMapper {
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhone(request.getPhone());
-        user.setIsActive(true);
+        user.setIsActive(false);
         user.setEmailVerified(false);
         return user;
     }

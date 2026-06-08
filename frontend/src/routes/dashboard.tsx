@@ -5,8 +5,14 @@ import { Calendar, Ticket, Award, TrendingUp, Bell, Download, MapPin, Loader2 } 
 import { EVENT_IMAGES } from "@/lib/events-data";
 import { formatCalendarDateMedium, formatCalendarDayMonth, parseCalendarYmd } from "@/lib/format-calendar-date";
 import { fetchMyBookings, fetchMyNotifications, type BookingItem, type NotificationItem } from "@/lib/api/dashboard";
+import { fetchBookingById } from "@/lib/api/bookings";
+import { downloadEventTicket } from "@/lib/ticket-download";
 import { resolveEventImageUrl } from "@/lib/api/events";
 import { authService } from "@/lib/api/auth";
+import { canAccessStudentDashboard } from "@/lib/auth/roles";
+import { postLoginPath } from "@/lib/auth/nav";
+import { useNavigate } from "@tanstack/react-router";
+import { useLayoutEffect } from "react";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Student Dashboard — MU Events" }] }),
@@ -54,8 +60,17 @@ function statusBadgeClass(status: string): string {
 }
 
 function DashboardPage() {
+  const navigate = useNavigate();
+
+  useLayoutEffect(() => {
+    const role = authService.getCurrentUser()?.role;
+    if (!canAccessStudentDashboard(role)) {
+      navigate({ to: postLoginPath(role) });
+    }
+  }, [navigate]);
+
   const user = authService.getCurrentUser();
-  const isStudent = user?.role === "STUDENT";
+  const canViewBookings = authService.isAuthenticated();
 
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -73,7 +88,7 @@ function DashboardPage() {
       } catch {
         if (!cancelled) setNotifications([]);
       }
-      if (!isStudent) {
+      if (!canViewBookings) {
         if (!cancelled) setBookings([]);
         if (!cancelled) setLoading(false);
         return;
@@ -93,7 +108,7 @@ function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [isStudent]);
+  }, [canViewBookings]);
 
   const { upcomingBookings, historyBookings, stats } = useMemo(() => {
     const upcoming = bookings
@@ -137,9 +152,9 @@ function DashboardPage() {
               {loadError}
             </p>
           ) : null}
-          {!isStudent ? (
+          {!canViewBookings ? (
             <p className="text-sm text-muted-foreground mb-6">
-              Bookings for events you registered for appear here when you use a student account.
+              Sign in to see events you registered for.
             </p>
           ) : null}
 
@@ -162,7 +177,7 @@ function DashboardPage() {
             <div className="space-y-8">
               <div className="bg-card border border-border rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h2 className="font-display text-xl font-bold">Upcoming bookings</h2>
+                  <h2 className="font-display text-xl font-bold">My registered events</h2>
                   <Link to="/events" className="text-xs text-primary font-semibold hover:underline">
                     Browse events →
                   </Link>
@@ -171,8 +186,8 @@ function DashboardPage() {
                   <div className="flex justify-center py-12 text-muted-foreground">
                     <Loader2 className="h-8 w-8 animate-spin" aria-label="Loading" />
                   </div>
-                ) : !isStudent ? (
-                  <p className="text-sm text-muted-foreground py-4">Sign in as a student and register for events to see bookings here.</p>
+                ) : !canViewBookings ? (
+                  <p className="text-sm text-muted-foreground py-4">Sign in to see your event registrations.</p>
                 ) : upcomingBookings.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-4">No upcoming registrations. Explore events and book your spot.</p>
                 ) : (
@@ -200,7 +215,34 @@ function DashboardPage() {
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{b.status}</span>
                           </div>
                         </div>
-                        <button type="button" className="p-2 hover:bg-secondary rounded-md shrink-0" title="Ticket / QR">
+                        <button
+                          type="button"
+                          className="p-2 hover:bg-secondary rounded-md shrink-0 disabled:opacity-40"
+                          title="Download ticket with QR"
+                          disabled={b.status === "CANCELLED"}
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                const ticket = b.qrCodeImage ? b : await fetchBookingById(b.id);
+                                downloadEventTicket(
+                                  {
+                                    id: ticket.id,
+                                    bookingReference: ticket.bookingReference,
+                                    rollNumber: ticket.rollNumber ?? user?.rollNumber,
+                                    qrCodeImage: ticket.qrCodeImage,
+                                    status: ticket.status,
+                                    paymentStatus: ticket.paymentStatus,
+                                    event: ticket.event,
+                                  },
+                                  displayName,
+                                  ticket.rollNumber ?? user?.rollNumber,
+                                );
+                              } catch {
+                                /* ignore */
+                              }
+                            })();
+                          }}
+                        >
                           <Download className="h-4 w-4 text-primary" />
                         </button>
                       </div>
@@ -211,11 +253,11 @@ function DashboardPage() {
 
               <div className="bg-card border border-border rounded-2xl p-6">
                 <h2 className="font-display text-xl font-bold mb-5">Booking history</h2>
-                {loading && isStudent ? (
+                {loading && canViewBookings ? (
                   <div className="flex justify-center py-8 text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
                   </div>
-                ) : !isStudent ? null : historyBookings.length === 0 ? (
+                ) : !canViewBookings ? null : historyBookings.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No past bookings yet.</p>
                 ) : (
                   <table className="w-full text-sm">

@@ -1,16 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { events as staticEvents, type CollegeEvent } from "@/lib/events-data";
-import { fetchUpcomingEvents } from "@/lib/api/events";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import type { CollegeEvent } from "@/lib/events-data";
+import { fetchEvents } from "@/lib/api/events";
 import {
   formatCalendarMonthYearHeading,
   getCalendarMonthShort,
   parseCalendarYmd,
 } from "@/lib/format-calendar-date";
 
-const DEFAULT_CALENDAR_VIEW = { y: 2026, m: 5 };
+function currentMonthView(): { y: number; m: number } {
+  const now = new Date();
+  return { y: now.getFullYear(), m: now.getMonth() + 1 };
+}
 
 function earliestEventMonth(list: CollegeEvent[]): { y: number; m: number } | null {
   let best: { y: number; m: number } | null = null;
@@ -46,20 +49,6 @@ function startWeekdaySundayFirstUtc(year: number, month1to12: number): number {
 }
 
 export const Route = createFileRoute("/calendar")({
-  loader: async () => {
-    try {
-      const list = await fetchUpcomingEvents({ page: 0, size: 500 });
-      const defaultView = earliestEventMonth(list) ?? DEFAULT_CALENDAR_VIEW;
-      return { events: list, defaultView, usedFallback: false };
-    } catch {
-      const list = staticEvents;
-      return {
-        events: list,
-        defaultView: earliestEventMonth(list) ?? DEFAULT_CALENDAR_VIEW,
-        usedFallback: true,
-      };
-    }
-  },
   head: () => ({
     meta: [
       { title: "Event Calendar — MU Events" },
@@ -70,12 +59,34 @@ export const Route = createFileRoute("/calendar")({
 });
 
 function CalendarPage() {
-  const { events: loadedEvents, defaultView, usedFallback } = Route.useLoaderData();
-  const [view, setView] = useState(defaultView);
+  const [loadedEvents, setLoadedEvents] = useState<CollegeEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [view, setView] = useState(currentMonthView);
 
   useEffect(() => {
-    setView(defaultView);
-  }, [defaultView.y, defaultView.m]);
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    void (async () => {
+      try {
+        const list = await fetchEvents({ page: 0, size: 500 });
+        if (cancelled) return;
+        setLoadedEvents(list);
+        const earliest = earliestEventMonth(list);
+        if (earliest) setView(earliest);
+      } catch (e) {
+        if (cancelled) return;
+        setLoadedEvents([]);
+        setLoadError(e instanceof Error ? e.message : "Could not load events.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const { y: year, m: month } = view;
   const firstDay = startWeekdaySundayFirstUtc(year, month);
@@ -114,8 +125,10 @@ function CalendarPage() {
           <p className="opacity-80">
             {formatCalendarMonthYearHeading(year, month)} · Mandsaur University & Partner Colleges
           </p>
-          {usedFallback ? (
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">Showing sample events — API unavailable.</p>
+          {loadedEvents.length === 0 && !loading ? (
+            <p className="text-xs opacity-70 mt-2">
+              No approved events in the database yet — use month navigation to browse; events will appear on dates when added.
+            </p>
           ) : null}
         </div>
       </section>
@@ -143,6 +156,18 @@ function CalendarPage() {
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
+
+          {loadError ? (
+            <p className="text-sm text-destructive text-center mb-4" role="alert">
+              {loadError} — calendar is still available below.
+            </p>
+          ) : null}
+
+          {loading ? (
+            <div className="flex justify-center py-8 text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin" aria-label="Loading calendar" />
+            </div>
+          ) : null}
 
           <div className="bg-card border border-border rounded-2xl shadow-card overflow-hidden">
             <div className="grid grid-cols-7 bg-secondary border-b border-border">
@@ -186,7 +211,9 @@ function CalendarPage() {
           <div className="mt-8">
             <h2 className="font-display text-xl font-bold mb-4">Events this month</h2>
             {eventsThisMonth.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No upcoming events in this month.</p>
+              <p className="text-sm text-muted-foreground">
+                No events scheduled in {formatCalendarMonthYearHeading(year, month)}. Try another month or add events in Admin.
+              </p>
             ) : (
               <div className="grid md:grid-cols-2 gap-4">
                 {eventsThisMonth.map((e) => (

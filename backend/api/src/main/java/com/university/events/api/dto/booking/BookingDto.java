@@ -19,7 +19,12 @@ public class BookingDto {
     
     private Long id;
     private String bookingReference;
+    /** Unique scannable entry code (same as booking reference). */
+    private String entryCode;
+    private String rollNumber;
     private String qrCode;
+    /** Base64 PNG data URL for ticket display and download. */
+    private String qrCodeImage;
     private String status;
     private String paymentStatus;
     private EventSummaryDto event;

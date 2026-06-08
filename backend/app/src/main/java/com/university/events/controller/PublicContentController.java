@@ -30,12 +30,17 @@ public class PublicContentController {
     @GetMapping("/partner-colleges")
     public ApiResponse<List<PartnerCollegeDto>> partnerColleges() {
         List<Collaboration> collaborations = collaborationRepository.findAll();
-        Map<Long, Long> offerCountByCollege = collaborations.stream()
-                .filter(c -> c.getStatus() == Collaboration.CollaborationStatus.APPROVED)
-                .filter(c -> c.getSpecialOffers() != null && !c.getSpecialOffers().isBlank())
-                .collect(Collectors.groupingBy(c -> c.getPartnerCollege().getId(), Collectors.counting()));
+        Map<Long, com.university.events.api.entity.College> collegesById = new java.util.LinkedHashMap<>();
+        for (Collaboration c : collaborations) {
+            if (c.getPartnerCollege() != null) {
+                collegesById.putIfAbsent(c.getPartnerCollege().getId(), c.getPartnerCollege());
+            }
+            if (c.getRequesterCollege() != null) {
+                collegesById.putIfAbsent(c.getRequesterCollege().getId(), c.getRequesterCollege());
+            }
+        }
 
-        List<PartnerCollegeDto> colleges = collegeRepository.findAllActiveColleges().stream()
+        List<PartnerCollegeDto> colleges = collegesById.values().stream()
                 .map(c -> PartnerCollegeDto.builder()
                         .id(c.getId())
                         .name(c.getName())
@@ -43,7 +48,7 @@ public class PublicContentController {
                         .city(c.getCity())
                         .state(c.getState())
                         .logo(c.getLogo())
-                        .activeOffers(offerCountByCollege.getOrDefault(c.getId(), 0L))
+                        .activeOffers(0L)
                         .build())
                 .toList();
         return ApiResponse.success(colleges);

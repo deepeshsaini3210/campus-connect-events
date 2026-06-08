@@ -28,7 +28,7 @@ public class BookingController {
     private final BookingService bookingService;
     
     @PostMapping
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create booking", description = "Register for an event")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Booking created successfully"),
@@ -41,7 +41,7 @@ public class BookingController {
     }
     
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get booking by ID", description = "Retrieve booking details")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Booking retrieved successfully"),
@@ -53,7 +53,7 @@ public class BookingController {
     }
     
     @GetMapping("/my-bookings")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get user bookings", description = "Retrieve current user's bookings")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Bookings retrieved successfully")
@@ -66,7 +66,7 @@ public class BookingController {
     }
     
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Cancel booking", description = "Cancel an existing booking")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Booking cancelled successfully"),
@@ -78,8 +78,23 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success(null, "Booking cancelled successfully"));
     }
     
+    @PostMapping("/{id}/complete-payment")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Complete payment", description = "Mark payment complete and issue QR entry pass")
+    public ResponseEntity<ApiResponse<BookingDto>> completePayment(@PathVariable Long id) {
+        BookingDto booking = bookingService.completePayment(id);
+        return ResponseEntity.ok(ApiResponse.success(booking, "Payment completed. Your entry pass is ready."));
+    }
+
+    @GetMapping("/verify/{entryCode}")
+    @Operation(summary = "Verify entry code", description = "Validate a scanned QR / entry code at event gate")
+    public ResponseEntity<ApiResponse<BookingDto>> verifyEntryCode(@PathVariable String entryCode) {
+        BookingDto booking = bookingService.verifyEntryCode(entryCode);
+        return ResponseEntity.ok(ApiResponse.success(booking, "Valid entry pass"));
+    }
+
     @PostMapping("/{id}/confirm")
-    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'COLLEGE_ADMIN')")
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'COLLEGE_ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Confirm booking", description = "Confirm a pending booking")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Booking confirmed successfully"),
@@ -91,7 +106,7 @@ public class BookingController {
     }
     
     @PostMapping("/{id}/mark-attended")
-    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'COLLEGE_ADMIN')")
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'COLLEGE_ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Mark booking as attended", description = "Mark a booking as attended")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Booking marked as attended"),
@@ -103,7 +118,7 @@ public class BookingController {
     }
     
     @GetMapping("/event/{eventId}/attendees")
-    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'COLLEGE_ADMIN')")
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'COLLEGE_ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Get event attendees", description = "Retrieve all attendees for an event")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Attendees retrieved successfully"),

@@ -13,7 +13,7 @@ type Props = {
  */
 export function AuthShell({ title, subtitle, children }: Props) {
   return (
-    <div className="min-h-[calc(100vh-10rem)] grid lg:grid-cols-2">
+    <div className="flex-1 grid lg:grid-cols-2 min-h-0">
       <div className="relative hidden lg:block overflow-hidden">
         <img src={heroImg} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-br from-ink/95 via-primary/40 to-ink/90" />

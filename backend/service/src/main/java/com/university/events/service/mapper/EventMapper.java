@@ -28,10 +28,14 @@ public interface EventMapper {
     @Mapping(target = "college", ignore = true)
     @Mapping(target = "highlights", ignore = true)
     @Mapping(target = "bookings", ignore = true)
+    @Mapping(target = "imageUrl", ignore = true)
     @Mapping(target = "seatsLeft", expression = "java(request.getSeatsTotal())")
     Event toEntity(CreateEventRequest request);
     
     @Mapping(target = "highlights", source = "highlights", qualifiedByName = "mapHighlights")
+    @Mapping(target = "organizer", source = "organizer", qualifiedByName = "mapOrganizer")
+    @Mapping(target = "category", source = "category", qualifiedByName = "mapEventCategory")
+    @Mapping(target = "college", source = "college", qualifiedByName = "mapCollege")
     EventDto toDto(Event event);
     
     @Mapping(target = "id", ignore = true)
@@ -73,7 +77,12 @@ public interface EventMapper {
     @Named("mapOrganizer")
     default EventDto.OrganizerDto mapOrganizer(com.university.events.api.entity.User organizer) {
         if (organizer == null) {
-            return null;
+            return EventDto.OrganizerDto.builder()
+                    .id(0L)
+                    .firstName("Unknown")
+                    .lastName("Organizer")
+                    .email("events@meu.edu.in")
+                    .build();
         }
         return EventDto.OrganizerDto.builder()
                 .id(organizer.getId())

@@ -2,7 +2,8 @@ import { useLayoutEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { authService } from "@/lib/api/auth";
-import { ADMIN_ROLES } from "@/lib/auth/roles";
+import { ADMIN_CONSOLE_ROLES } from "@/lib/auth/roles";
+import { postLoginPath } from "@/lib/auth/nav";
 
 export function RequireAdmin({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -21,8 +22,9 @@ export function RequireAdmin({ children }: { children: React.ReactNode }) {
       });
       return;
     }
-    if (!authService.hasAnyRole([...ADMIN_ROLES])) {
-      navigate({ to: "/dashboard" });
+    const role = authService.getCurrentUser()?.role;
+    if (!authService.hasAnyRole([...ADMIN_CONSOLE_ROLES])) {
+      navigate({ to: postLoginPath(role) });
       return;
     }
     setReady(true);

@@ -202,11 +202,31 @@ export async function fetchUpcomingEvents(params: { page?: number; size?: number
 }
 
 export async function fetchEventById(eventId: string): Promise<CollegeEvent> {
+  const dto = await fetchEventRawById(eventId);
+  return toCollegeEvent(dto);
+}
+
+export async function fetchEventRawById(eventId: string): Promise<BackendEvent> {
   const response = await fetch(`${getApiBaseUrl()}/v1/events/${eventId}`);
   if (!response.ok) throw new Error("Unable to fetch event details.");
-
   const payload = (await response.json()) as ApiEnvelope<BackendEvent>;
-  return toCollegeEvent(payload.data);
+  return payload.data;
+}
+
+const CATEGORY_NAME_TO_ID: Record<string, number> = {
+  Technical: 1,
+  Cultural: 2,
+  Sports: 3,
+  Workshop: 4,
+  Seminar: 5,
+  Hackathon: 6,
+  Fest: 7,
+  Placement: 8,
+  Competition: 9,
+};
+
+export function categoryNameToId(name: string): number {
+  return CATEGORY_NAME_TO_ID[name] ?? 1;
 }
 
 export type CreateEventPayload = {
@@ -222,11 +242,10 @@ export type CreateEventPayload = {
   deadline: string;
   isFeatured?: boolean;
   isPartnerEvent?: boolean;
-  imageUrl?: string | null;
   highlights?: string[];
 };
 
-/** Upload a poster image to MinIO via the API; returns the public URL for {@link createEvent}. */
+/** Upload a poster image to MinIO via the API; returns the public URL (e.g. for updates). */
 export async function uploadEventImage(file: File): Promise<string> {
   const token =
     typeof globalThis !== "undefined" && "localStorage" in globalThis
@@ -262,33 +281,39 @@ function unwrapApiData<T>(raw: unknown): T {
   return raw as T;
 }
 
-export async function createEvent(payload: CreateEventPayload): Promise<CollegeEvent> {
+export async function createEvent(payload: CreateEventPayload, image: File): Promise<CollegeEvent> {
   const token =
     typeof globalThis !== "undefined" && "localStorage" in globalThis
       ? globalThis.localStorage.getItem("token")
       : null;
+  if (!token) throw new Error("Sign in to create an event.");
+
+  const eventJson = {
+    title: payload.title.trim(),
+    description: payload.description.trim(),
+    categoryId: payload.categoryId,
+    eventDate: payload.eventDate,
+    eventTime: payload.eventTime,
+    venue: payload.venue.trim(),
+    mode: payload.mode,
+    fee: payload.fee,
+    seatsTotal: payload.seatsTotal,
+    deadline: payload.deadline,
+    isFeatured: Boolean(payload.isFeatured),
+    isPartnerEvent: Boolean(payload.isPartnerEvent),
+    highlights: payload.highlights && payload.highlights.length > 0 ? payload.highlights : undefined,
+  };
+
+  const form = new FormData();
+  form.append("event", new Blob([JSON.stringify(eventJson)], { type: "application/json" }));
+  form.append("image", image);
+
   const response = await fetch(`${getApiBaseUrl()}/v1/events`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({
-      title: payload.title.trim(),
-      description: payload.description.trim(),
-      categoryId: payload.categoryId,
-      eventDate: payload.eventDate,
-      eventTime: payload.eventTime,
-      venue: payload.venue.trim(),
-      mode: payload.mode,
-      fee: payload.fee,
-      seatsTotal: payload.seatsTotal,
-      deadline: payload.deadline,
-      isFeatured: Boolean(payload.isFeatured),
-      isPartnerEvent: Boolean(payload.isPartnerEvent),
-      imageUrl: payload.imageUrl?.trim() || undefined,
-      highlights: payload.highlights && payload.highlights.length > 0 ? payload.highlights : undefined,
-    }),
+    body: form,
   });
   const raw = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -300,4 +325,106 @@ export async function createEvent(payload: CreateEventPayload): Promise<CollegeE
   }
   const dto = unwrapApiData<BackendEvent>(raw);
   return toCollegeEvent(dto);
+}
+
+export async function approveEvent(eventId: string | number): Promise<void> {
+  const token =
+    typeof globalThis !== "undefined" && "localStorage" in globalThis
+      ? globalThis.localStorage.getItem("token")
+      : null;
+  const response = await fetch(`${getApiBaseUrl()}/v1/events/${eventId}/approve`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    const raw = await response.json().catch(() => ({}));
+    throw new Error((raw as { message?: string }).message || "Could not approve event.");
+  }
+}
+
+export type UpdateEventPayload = {
+  title?: string;
+  description?: string;
+  categoryId?: number;
+  eventDate?: string;
+  eventTime?: string;
+  venue?: string;
+  mode?: "ONLINE" | "OFFLINE" | "HYBRID";
+  fee?: number;
+  seatsTotal?: number;
+  deadline?: string;
+  isFeatured?: boolean;
+  isPartnerEvent?: boolean;
+  imageUrl?: string | null;
+  highlights?: string[];
+};
+
+export async function updateEvent(eventId: string | number, payload: UpdateEventPayload): Promise<CollegeEvent> {
+  const token =
+    typeof globalThis !== "undefined" && "localStorage" in globalThis
+      ? globalThis.localStorage.getItem("token")
+      : null;
+  const response = await fetch(`${getApiBaseUrl()}/v1/events/${eventId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+  const raw = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((raw as { message?: string }).message || "Could not update event.");
+  }
+  const dto = unwrapApiData<BackendEvent>(raw);
+  return toCollegeEvent(dto);
+}
+
+export async function deleteEvent(eventId: string | number): Promise<string> {
+  const token =
+    typeof globalThis !== "undefined" && "localStorage" in globalThis
+      ? globalThis.localStorage.getItem("token")
+      : null;
+  const response = await fetch(`${getApiBaseUrl()}/v1/events/${eventId}`, {
+    method: "DELETE",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  const raw = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((raw as { message?: string }).message || "Could not delete event.");
+  }
+  return (raw as { message?: string }).message || "Event deleted successfully.";
+}
+
+/** Draft + pending events awaiting admin approval */
+export async function fetchPendingApprovalEvents(): Promise<CollegeEvent[]> {
+  const [draft, pending] = await Promise.all([
+    fetchEvents({ includeAllStatuses: true, status: "DRAFT", page: 0, size: 100 }),
+    fetchEvents({ includeAllStatuses: true, status: "PENDING_APPROVAL", page: 0, size: 100 }),
+  ]);
+  const byId = new Map<string, CollegeEvent>();
+  for (const e of [...draft, ...pending]) byId.set(e.id, e);
+  return Array.from(byId.values());
+}
+
+export async function rejectEvent(eventId: string | number, reason: string): Promise<void> {
+  const token =
+    typeof globalThis !== "undefined" && "localStorage" in globalThis
+      ? globalThis.localStorage.getItem("token")
+      : null;
+  const query = new URLSearchParams({ reason });
+  const response = await fetch(`${getApiBaseUrl()}/v1/events/${eventId}/reject?${query}`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    const raw = await response.json().catch(() => ({}));
+    throw new Error((raw as { message?: string }).message || "Could not reject event.");
+  }
 }

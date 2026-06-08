@@ -24,6 +24,7 @@ export interface LoginResponse {
     email: string;
     firstName: string;
     lastName: string;
+    rollNumber?: string | null;
     role: string;
     isActive: boolean;
     emailVerified: boolean;
@@ -246,7 +247,7 @@ class AuthService {
     return { ...response, data: null as LoginResponse | null };
   }
 
-  /** Register and persist session (same tokens shape as login). */
+  /** Register; session tokens are issued only after email verification and login. */
   async register(payload: RegisterPayload): Promise<ApiResponse<LoginResponse | null>> {
     const body: Record<string, unknown> = {
       firstName: payload.firstName.trim(),
@@ -277,19 +278,22 @@ class AuthService {
     const envelope = raw as Record<string, unknown>;
     const inner = (envelope?.data ?? envelope) as Record<string, unknown>;
     const mapped = this.mapAuthPayload(inner);
-    if (mapped) {
+    const message =
+      (envelope.message as string) ||
+      "Registration received. Check your email to verify your account before signing in.";
+
+    if (mapped?.token) {
       this.setToken(mapped.token);
       this.setRefreshToken(mapped.refreshToken);
       this.setUser(mapped.user);
       notifyAuthChanged();
-      return {
-        success: true,
-        message: (envelope.message as string) || "Registered",
-        data: mapped,
-      };
     }
 
-    return { success: false, message: "Invalid registration response", data: null };
+    return {
+      success: true,
+      message,
+      data: mapped?.token ? mapped : null,
+    };
   }
 
   async forgotPassword(email: string): Promise<ApiResponse<ForgotPasswordResponse>> {

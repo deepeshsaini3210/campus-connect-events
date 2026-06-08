@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { authService } from "@/lib/api/auth";
 import { safeRedirectPath } from "@/lib/auth/redirect-path";
+import { postLoginPath } from "@/lib/auth/nav";
 
 type LoginSearch = { redirect?: string };
 
@@ -32,7 +33,9 @@ function LoginPage() {
     try {
       const res = await authService.login({ email: email.trim(), password });
       if (res.success && res.data) {
-        navigate({ to: safeRedirectPath(redirect) });
+        const role = res.data.user?.role;
+        const target = redirect ? safeRedirectPath(redirect) : postLoginPath(role);
+        navigate({ to: target });
         return;
       }
       setError(res.message || "Could not sign in. Check your email and password.");

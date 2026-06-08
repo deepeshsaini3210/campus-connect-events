@@ -32,7 +32,7 @@ export type Testimonial = {
 
 export type CollaborationRequestPayload = {
   requesterCollegeId: number;
-  partnerCollegeId: number;
+  partnerUniversityName: string;
   coordinatorName: string;
   coordinatorEmail: string;
   notes?: string;

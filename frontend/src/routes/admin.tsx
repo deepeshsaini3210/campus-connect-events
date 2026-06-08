@@ -1,9 +1,41 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Users, Calendar, TrendingUp, CheckCircle2, XCircle, Clock, MoreVertical, Plus } from "lucide-react";
-import { events as fallbackEvents, type CollegeEvent } from "@/lib/events-data";
-import { fetchEvents } from "@/lib/api/events";
+import { Users, Calendar, TrendingUp, CheckCircle2, XCircle, Clock, MoreVertical, Plus, Loader2, Pencil, Trash2 } from "lucide-react";
+import type { CollegeEvent } from "@/lib/events-data";
+import {
+  approveEvent,
+  deleteEvent,
+  fetchEvents,
+  fetchPendingApprovalEvents,
+  rejectEvent,
+} from "@/lib/api/events";
+import { authService } from "@/lib/api/auth";
+import { ROLE_COLLEGE_ADMIN, ROLE_SUPER_ADMIN, isSuperAdminRole } from "@/lib/auth/roles";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  approveCollaborationRequest,
+  fetchCollaborationRequests,
+  rejectCollaborationRequest,
+  type CollaborationRequest,
+} from "@/lib/api/collaborations";
 import { CreateEventDialog } from "@/components/admin/CreateEventDialog";
+import { EditEventDialog } from "@/components/admin/EditEventDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { RequireAdmin } from "@/components/auth/RequireAdmin";
 import { formatCalendarDateMedium } from "@/lib/format-calendar-date";
 
@@ -21,25 +53,148 @@ function statusBadgeClass(status?: string) {
   return "bg-secondary text-secondary-foreground";
 }
 
+function formatRequestDate(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
 function AdminPage() {
   const [createOpen, setCreateOpen] = useState(false);
-  const [eventRows, setEventRows] = useState<CollegeEvent[]>(fallbackEvents);
+  const [editEvent, setEditEvent] = useState<CollegeEvent | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [approvedEvents, setApprovedEvents] = useState<CollegeEvent[]>([]);
+  const [pendingEvents, setPendingEvents] = useState<CollegeEvent[]>([]);
+  const [collaborationRequests, setCollaborationRequests] = useState<CollaborationRequest[]>([]);
   const [listError, setListError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CollegeEvent | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
 
-  const loadEvents = useCallback(async () => {
+  const currentRole = authService.getCurrentUser()?.role;
+  const isSystemAdmin = isSuperAdminRole(currentRole);
+  const canApproveEvents = authService.hasAnyRole([ROLE_COLLEGE_ADMIN, ROLE_SUPER_ADMIN]);
+
+  const showFeedback = (title: string, message: string) => {
+    setFeedbackTitle(title);
+    setFeedbackMessage(message);
+    setFeedbackOpen(true);
+  };
+
+  const loadApprovedEvents = useCallback(async () => {
     try {
-      const list = await fetchEvents({ includeAllStatuses: true, page: 0, size: 200 });
-      setEventRows(list.length ? list : fallbackEvents);
+      const list = await fetchEvents({ status: "APPROVED", page: 0, size: 200 });
+      setApprovedEvents(list);
       setListError(null);
     } catch {
-      setListError("Showing cached sample data — API could not be reached.");
-      setEventRows(fallbackEvents);
+      setListError("Could not load approved events from API.");
+      setApprovedEvents([]);
+    }
+  }, []);
+
+  const loadPending = useCallback(async () => {
+    try {
+      const [eventsPending, collabPending] = await Promise.all([
+        fetchPendingApprovalEvents(),
+        fetchCollaborationRequests({ status: "PENDING", page: 0, size: 50 }),
+      ]);
+      setPendingEvents(eventsPending);
+      setCollaborationRequests(collabPending);
+    } catch {
+      setPendingEvents([]);
+      setCollaborationRequests([]);
     }
   }, []);
 
   useEffect(() => {
-    void loadEvents();
-  }, [loadEvents]);
+    void loadApprovedEvents();
+    void loadPending();
+  }, [loadApprovedEvents, loadPending]);
+
+  async function handleApproveEvent(eventId: string) {
+    setActionLoading(`event-approve-${eventId}`);
+    try {
+      await approveEvent(eventId);
+      toast.success("Event approved");
+      showFeedback("Approved", "The event is now live on the portal.");
+      await Promise.all([loadApprovedEvents(), loadPending()]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not approve event.";
+      toast.error(msg);
+      showFeedback("Approval failed", msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleRejectEvent(eventId: string) {
+    const reason = globalThis.prompt("Rejection reason (optional):") ?? "Rejected by admin";
+    setActionLoading(`event-reject-${eventId}`);
+    try {
+      await rejectEvent(eventId, reason);
+      toast.success("Event rejected");
+      showFeedback("Rejected", "The event was removed from the approval queue.");
+      await Promise.all([loadApprovedEvents(), loadPending()]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not reject event.";
+      toast.error(msg);
+      showFeedback("Rejection failed", msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleApproveCollaboration(id: number) {
+    setActionLoading(`collab-approve-${id}`);
+    try {
+      await approveCollaborationRequest(id);
+      await loadPending();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not approve collaboration.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleRejectCollaboration(id: number) {
+    const reason = globalThis.prompt("Rejection reason (optional):") ?? "Rejected by admin";
+    setActionLoading(`collab-reject-${id}`);
+    try {
+      await rejectCollaborationRequest(id, reason);
+      await loadPending();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not reject collaboration.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  const pendingTotal = pendingEvents.length + collaborationRequests.length;
+  const activeEvents = approvedEvents.length;
+  const totalRegistrations = approvedEvents.reduce((sum, e) => sum + (e.seatsTotal - e.seatsLeft), 0);
+
+  async function confirmDeleteEvent() {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    const title = deleteTarget.title;
+    setActionLoading(`delete-${id}`);
+    try {
+      const msg = await deleteEvent(id);
+      setDeleteTarget(null);
+      toast.success(msg);
+      showFeedback("Deleted", `"${title}" was deleted successfully.`);
+      await loadApprovedEvents();
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : "Delete failed.";
+      toast.error(errMsg);
+      showFeedback("Delete failed", errMsg);
+    } finally {
+      setActionLoading(null);
+    }
+  }
 
   return (
     <RequireAdmin>
@@ -49,6 +204,13 @@ function AdminPage() {
           <div>
             <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-1">Admin Console</p>
             <h1 className="font-display text-3xl md:text-4xl font-bold">Events & Operations</h1>
+            {isSystemAdmin ? (
+              <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+                Signed in as <span className="font-semibold text-foreground">System Admin (SUPER_ADMIN)</span> — full access:
+                create/edit/delete events, approve & reject, collaboration requests, and onboarding check-in.
+                Student Dashboard is hidden for this role.
+              </p>
+            ) : null}
             {listError ? <p className="text-sm text-amber-700 dark:text-amber-400 mt-2">{listError}</p> : null}
           </div>
           <button
@@ -60,15 +222,55 @@ function AdminPage() {
           </button>
         </div>
 
-        <CreateEventDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => void loadEvents()} />
+        <CreateEventDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => { void loadApprovedEvents(); void loadPending(); }} />
+        <EditEventDialog
+          event={editEvent}
+          open={editOpen}
+          onOpenChange={(o) => {
+            setEditOpen(o);
+            if (!o) setEditEvent(null);
+          }}
+          onUpdated={() => void loadApprovedEvents()}
+        />
 
-        {/* KPIs */}
+        <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete event?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Delete &quot;{deleteTarget?.title}&quot;? This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => void confirmDeleteEvent()}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{feedbackTitle}</AlertDialogTitle>
+              <AlertDialogDescription>{feedbackMessage}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction>OK</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
-            { icon: Calendar, label: "Active Events", value: "32", change: "+4 this week" },
-            { icon: Users, label: "Total Registrations", value: "8,247", change: "+512 this week" },
-            { icon: TrendingUp, label: "Attendance Rate", value: "87%", change: "+3% vs last month" },
-            { icon: Clock, label: "Pending Approvals", value: "9", change: "5 collaboration" },
+            { icon: Calendar, label: "Active Events", value: String(activeEvents), change: `${approvedEvents.length} approved` },
+            { icon: Users, label: "Total Registrations", value: String(totalRegistrations), change: "From seat counts" },
+            { icon: TrendingUp, label: "Approved Events", value: String(activeEvents), change: "Live on portal" },
+            { icon: Clock, label: "Pending Approvals", value: String(pendingTotal), change: `${collaborationRequests.length} collaboration` },
           ].map((s, i) => (
             <div key={i} className="bg-card border border-border rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
@@ -81,91 +283,126 @@ function AdminPage() {
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-display text-xl font-bold">Registrations — Last 7 days</h2>
-              <span className="text-xs text-muted-foreground">vs previous period</span>
-            </div>
-            <div className="h-56 flex items-end gap-3">
-              {[40, 65, 50, 80, 95, 70, 110].map((h, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                  <div
-                    className="w-full bg-gradient-to-t from-primary to-gold rounded-t-md transition-all hover:opacity-80"
-                    style={{ height: `${h}%` }}
-                  />
-                  <span className="text-[10px] text-muted-foreground font-medium">D{i + 1}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-2xl p-6">
-            <h2 className="font-display text-xl font-bold mb-5">By Category</h2>
-            <div className="space-y-3">
-              {[
-                { c: "Hackathon", p: 28, color: "bg-primary" },
-                { c: "Cultural", p: 22, color: "bg-[oklch(0.65_0.18_320)]" },
-                { c: "Workshop", p: 18, color: "bg-[oklch(0.65_0.16_240)]" },
-                { c: "Sports", p: 16, color: "bg-success" },
-                { c: "Seminar", p: 16, color: "bg-gold" },
-              ].map((r) => (
-                <div key={r.c}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-medium">{r.c}</span>
-                    <span className="text-muted-foreground">{r.p}%</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className={`h-full ${r.color}`} style={{ width: `${r.p * 2}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
         <div className="bg-card border border-border rounded-2xl p-6 mb-8">
-          <h2 className="font-display text-xl font-bold mb-5">Pending Approvals</h2>
+          <h2 className="font-display text-xl font-bold mb-1">Pending Event Approvals</h2>
+          <p className="text-xs text-muted-foreground mb-5">Draft and pending events — approve or reject to publish.</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                 <tr>
                   <th className="py-2">Event</th>
-                  <th className="py-2">Type</th>
-                  <th className="py-2">Submitted by</th>
+                  <th className="py-2">Category</th>
+                  <th className="py-2">Organizer</th>
                   <th className="py-2">Date</th>
+                  <th className="py-2">Status</th>
                   <th className="py-2 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {[
-                  { t: "Tech Symposium 2026", type: "Event", by: "Dr. Verma · CSE Dept", date: "May 9" },
-                  { t: "Joint Cultural Night with DAVV", type: "Collaboration", by: "DAVV Indore", date: "May 8" },
-                  { t: "Inter-college Debate", type: "Event", by: "Liberal Arts Club", date: "May 7" },
-                ].map((r, i) => (
-                  <tr key={i} className="border-b border-border last:border-0">
-                    <td className="py-3 pr-4 font-medium">{r.t}</td>
-                    <td className="py-3 pr-4">
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-accent text-accent-foreground">{r.type}</span>
-                    </td>
-                    <td className="py-3 pr-4 text-muted-foreground">{r.by}</td>
-                    <td className="py-3 pr-4 text-muted-foreground">{r.date}</td>
-                    <td className="py-3 text-right">
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-success/15 text-success rounded-md hover:bg-success/25 mr-1"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Approve
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-destructive/10 text-destructive rounded-md hover:bg-destructive/20"
-                      >
-                        <XCircle className="h-3.5 w-3.5" /> Reject
-                      </button>
-                    </td>
+                {pendingEvents.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-muted-foreground">No draft or pending events.</td>
                   </tr>
-                ))}
+                ) : (
+                  pendingEvents.map((r) => (
+                    <tr key={r.id} className="border-b border-border last:border-0">
+                      <td className="py-3 pr-4 font-medium">{r.title}</td>
+                      <td className="py-3 pr-4">{r.category}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{r.organizer}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{formatCalendarDateMedium(r.date)}</td>
+                      <td className="py-3 pr-4">
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${statusBadgeClass(r.approvalStatus)}`}>
+                          {r.approvalStatus || "—"}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          disabled={actionLoading !== null || !canApproveEvents}
+                          title={canApproveEvents ? undefined : "Only College Admin or Super Admin can approve"}
+                          onClick={() => void handleApproveEvent(r.id)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-success/15 text-success rounded-md hover:bg-success/25 mr-1 disabled:opacity-50"
+                        >
+                          {actionLoading === `event-approve-${r.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoading !== null || !canApproveEvents}
+                          title={canApproveEvents ? undefined : "Only College Admin or Super Admin can reject"}
+                          onClick={() => void handleRejectEvent(r.id)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-destructive/10 text-destructive rounded-md hover:bg-destructive/20 disabled:opacity-50"
+                        >
+                          {actionLoading === `event-reject-${r.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                          Reject
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {!canApproveEvents ? (
+            <p className="text-xs text-muted-foreground mt-4">Organizers can submit events; approval requires College Admin or Super Admin.</p>
+          ) : null}
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-6 mb-8">
+          <h2 className="font-display text-xl font-bold mb-5">Collaboration Requests</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                <tr>
+                  <th className="py-2">Requester</th>
+                  <th className="py-2">Partner</th>
+                  <th className="py-2">Coordinator</th>
+                  <th className="py-2">Notes</th>
+                  <th className="py-2">Submitted</th>
+                  <th className="py-2 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {collaborationRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-muted-foreground">No pending collaboration requests.</td>
+                  </tr>
+                ) : (
+                  collaborationRequests.map((r) => (
+                    <tr key={r.id} className="border-b border-border last:border-0 align-top">
+                      <td className="py-3 pr-4 font-medium">{r.requesterCollege?.name ?? "—"}</td>
+                      <td className="py-3 pr-4">{r.partnerCollege?.name ?? "—"}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">
+                        <div className="font-medium text-foreground">{r.coordinatorName || "—"}</div>
+                        {r.coordinatorEmail ? <div className="text-xs">{r.coordinatorEmail}</div> : null}
+                      </td>
+                      <td className="py-3 pr-4 text-muted-foreground max-w-xs">
+                        <p className="line-clamp-3 whitespace-pre-wrap">{r.notes || r.specialOffers || "—"}</p>
+                      </td>
+                      <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">{formatRequestDate(r.requestDate)}</td>
+                      <td className="py-3 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          disabled={actionLoading !== null}
+                          onClick={() => void handleApproveCollaboration(r.id)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-success/15 text-success rounded-md hover:bg-success/25 mr-1 disabled:opacity-50"
+                        >
+                          {actionLoading === `collab-approve-${r.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoading !== null}
+                          onClick={() => void handleRejectCollaboration(r.id)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-destructive/10 text-destructive rounded-md hover:bg-destructive/20 disabled:opacity-50"
+                        >
+                          {actionLoading === `collab-reject-${r.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                          Reject
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -174,6 +411,7 @@ function AdminPage() {
         <div className="bg-card border border-border rounded-2xl p-6">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <h2 className="font-display text-xl font-bold">All Events</h2>
+            <span className="text-xs text-muted-foreground">Approved only</span>
             <p className="text-xs text-muted-foreground">
               Need access?{" "}
               <Link to="/login" className="text-primary font-semibold hover:underline">
@@ -195,7 +433,14 @@ function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {eventRows.map((e) => {
+                {approvedEvents.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                      No approved events yet.
+                    </td>
+                  </tr>
+                ) : null}
+                {approvedEvents.map((e) => {
                   const reg = e.seatsTotal - e.seatsLeft;
                   const statusLabel = e.approvalStatus || "—";
                   return (
@@ -209,7 +454,7 @@ function AdminPage() {
                             {reg}/{e.seatsTotal}
                           </span>
                           <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary" style={{ width: `${(reg / e.seatsTotal) * 100}%` }} />
+                            <div className="h-full bg-primary" style={{ width: `${e.seatsTotal ? (reg / e.seatsTotal) * 100 : 0}%` }} />
                           </div>
                         </div>
                       </td>
@@ -219,9 +464,29 @@ function AdminPage() {
                         </span>
                       </td>
                       <td className="py-3 text-right">
-                        <button type="button" className="p-1.5 hover:bg-secondary rounded">
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button type="button" className="p-1.5 hover:bg-secondary rounded" aria-label="Event actions">
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditEvent(e);
+                                setEditOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setDeleteTarget(e)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   );

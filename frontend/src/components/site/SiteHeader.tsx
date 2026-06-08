@@ -3,15 +3,7 @@ import { GraduationCap, Search, Menu, X, Facebook, Twitter, Instagram, Youtube, 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authService, AUTH_CHANGED_EVENT } from "@/lib/api/auth";
-import { ADMIN_ROLES } from "@/lib/auth/roles";
-
-const publicNav = [
-  { to: "/", label: "Home" },
-  { to: "/events", label: "Events" },
-  { to: "/calendar", label: "Calendar" },
-  { to: "/gallery", label: "Gallery" },
-  { to: "/collaborate", label: "Collaborate" },
-] as const;
+import { buildNavItems } from "@/lib/auth/nav";
 
 export function SiteHeader() {
   const navigate = useNavigate();
@@ -29,17 +21,7 @@ export function SiteHeader() {
 
   const isAuthenticated = authReady && authService.isAuthenticated();
 
-  const nav = useMemo(() => {
-    const items: { to: string; label: string }[] = [...publicNav];
-    if (!authReady) return items;
-    if (authService.isAuthenticated()) {
-      items.push({ to: "/dashboard", label: "Student Dashboard" });
-    }
-    if (authService.hasAnyRole([...ADMIN_ROLES])) {
-      items.push({ to: "/admin", label: "Admin" });
-    }
-    return items;
-  }, [authTick, authReady]);
+  const nav = useMemo(() => buildNavItems(authReady), [authTick, authReady]);
 
   async function onSignOut() {
     await authService.logout();

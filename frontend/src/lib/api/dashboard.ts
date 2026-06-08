@@ -12,6 +12,11 @@ type Paginated<T> = {
 export type BookingItem = {
   id: number;
   bookingReference: string;
+  entryCode?: string;
+  rollNumber?: string | null;
+  qrCode?: string;
+  qrCodeImage?: string;
+  paymentStatus?: string;
   status: string;
   event: {
     id: number;

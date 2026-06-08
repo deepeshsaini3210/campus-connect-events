@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useEffect, useState } from "react";
 import { Loader2, Search, Filter } from "lucide-react";
-import { events, categories, EVENT_CATEGORY_IDS, type EventCategory, type CollegeEvent } from "@/lib/events-data";
+import { categories, EVENT_CATEGORY_IDS, type EventCategory, type CollegeEvent } from "@/lib/events-data";
 import { EventCard } from "@/components/site/EventCard";
 import { fetchEventsPage } from "@/lib/api/events";
 
@@ -15,28 +15,7 @@ function modeToApi(mode: "All" | "Online" | "Offline" | "Hybrid"): "ONLINE" | "O
   return "HYBRID";
 }
 
-function applyClientFilter(
-  source: CollegeEvent[],
-  opts: {
-    keyword: string;
-    category: EventCategory | "All";
-    mode: "All" | "Online" | "Offline" | "Hybrid";
-    fee: "All" | "Free" | "Paid";
-  },
-): CollegeEvent[] {
-  const q = opts.keyword.toLowerCase();
-  return source.filter((e) => {
-    if (opts.category !== "All" && e.category !== opts.category) return false;
-    if (opts.mode !== "All" && e.mode !== opts.mode) return false;
-    if (opts.fee === "Free" && e.fee !== 0) return false;
-    if (opts.fee === "Paid" && e.fee === 0) return false;
-    if (q && !`${e.title} ${e.college} ${e.organizer}`.toLowerCase().includes(q)) return false;
-    return true;
-  });
-}
-
 export const Route = createFileRoute("/events/")({
-  loader: () => ({ fallback: events }),
   validateSearch: (s: Record<string, unknown>): SearchParams => ({
     category: s.category as EventCategory | undefined,
   }),
@@ -50,7 +29,6 @@ export const Route = createFileRoute("/events/")({
 });
 
 function EventsPage() {
-  const { fallback } = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = useNavigate();
 
@@ -63,7 +41,7 @@ function EventsPage() {
   const [list, setList] = useState<CollegeEvent[]>([]);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [usedFallback, setUsedFallback] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedKeyword(query.trim()), 350);
@@ -77,7 +55,7 @@ function EventsPage() {
   useEffect(() => {
     const ac = new AbortController();
     setLoading(true);
-    setUsedFallback(false);
+    setLoadError(null);
 
     const categoryId = category === "All" ? undefined : EVENT_CATEGORY_IDS[category];
     const modeParam = modeToApi(mode);
@@ -102,23 +80,17 @@ function EventsPage() {
         setTotalElements(total);
       } catch (e) {
         if (e instanceof Error && e.name === "AbortError") return;
-        const filtered = applyClientFilter(fallback, {
-          keyword: debouncedKeyword,
-          category,
-          mode,
-          fee,
-        });
         if (ac.signal.aborted) return;
-        setList(filtered);
-        setTotalElements(filtered.length);
-        setUsedFallback(true);
+        setList([]);
+        setTotalElements(0);
+        setLoadError(e instanceof Error ? e.message : "Could not load events from server.");
       } finally {
         if (!ac.signal.aborted) setLoading(false);
       }
     })();
 
     return () => ac.abort();
-  }, [debouncedKeyword, category, mode, fee, fallback]);
+  }, [debouncedKeyword, category, mode, fee]);
 
   function resetFilters() {
     setQuery("");
@@ -130,7 +102,7 @@ function EventsPage() {
   }
 
   const countLabel =
-    usedFallback || totalElements <= list.length
+    totalElements <= list.length
       ? `${list.length} event${list.length === 1 ? "" : "s"}`
       : `${list.length} of ${totalElements} events`;
 
@@ -212,7 +184,7 @@ function EventsPage() {
                   <>Showing {countLabel}</>
                 )}
               </span>
-              {usedFallback ? <span className="text-amber-700 dark:text-amber-500">Sample list (API unavailable).</span> : null}
+              {loadError ? <span className="text-destructive">{loadError}</span> : null}
             </div>
           </div>
 

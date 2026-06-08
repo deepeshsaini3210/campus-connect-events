@@ -15,4 +15,7 @@ public class CreateBookingRequest {
     
     @NotNull(message = "Event ID is required")
     private Long eventId;
+
+    /** Optional roll number saved on the user profile when registering. */
+    private String rollNumber;
 }

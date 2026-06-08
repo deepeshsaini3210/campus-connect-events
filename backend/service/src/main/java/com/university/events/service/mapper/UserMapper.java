@@ -15,7 +15,7 @@ public interface UserMapper {
     
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "passwordHash", ignore = true)
-    @Mapping(target = "isActive", constant = "true")
+    @Mapping(target = "isActive", constant = "false")
     @Mapping(target = "emailVerified", constant = "false")
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
@@ -84,6 +84,7 @@ public interface UserMapper {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .phone(user.getPhone())
+                .rollNumber(user.getRollNumber())
                 .profileImage(user.getProfileImage())
                 .role(user.getRole() != null ? user.getRole().getName() : null)
                 .collegeName(user.getCollege() != null ? user.getCollege().getName() : null)

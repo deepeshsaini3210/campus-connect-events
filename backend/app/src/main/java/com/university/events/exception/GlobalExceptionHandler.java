@@ -46,11 +46,32 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
-        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        String cause = ex.getMostSpecificCause().getMessage();
+        log.warn("Data integrity violation: {}", cause);
+
+        String message = resolveDataIntegrityMessage(cause);
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error(
-                        "Data conflict (duplicate or invalid reference). Check roles/colleges exist and email is unique.",
-                        HttpStatus.CONFLICT));
+                .body(ApiResponse.error(message, HttpStatus.CONFLICT));
+    }
+
+    private static String resolveDataIntegrityMessage(String cause) {
+        if (cause == null) {
+            return "Data conflict. The request could not be completed.";
+        }
+        String lower = cause.toLowerCase();
+        if (lower.contains("unique_user_event") || (lower.contains("user_id") && lower.contains("event_id"))) {
+            return "You are already registered for this event.";
+        }
+        if (lower.contains("booking_reference")) {
+            return "Could not generate a unique booking reference. Please try again.";
+        }
+        if (lower.contains("email") && lower.contains("duplicate")) {
+            return EMAIL_EXISTS;
+        }
+        if (lower.contains("created_at") || lower.contains("updated_at")) {
+            return "Booking could not be saved. Please try again.";
+        }
+        return "Data conflict (duplicate or invalid reference). Check roles/colleges exist and email is unique.";
     }
 
     @ExceptionHandler(RuntimeException.class)
@@ -59,6 +80,9 @@ public class GlobalExceptionHandler {
         log.warn("{}: {}", ex.getClass().getSimpleName(), message);
 
         if (EMAIL_EXISTS.equals(message)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(message, HttpStatus.CONFLICT));
+        }
+        if ("Already booked for this event".equals(message)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(message, HttpStatus.CONFLICT));
         }
 

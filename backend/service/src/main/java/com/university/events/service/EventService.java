@@ -5,13 +5,14 @@ import com.university.events.api.dto.event.CreateEventRequest;
 import com.university.events.api.dto.event.EventDto;
 import com.university.events.api.dto.event.EventSearchRequest;
 import com.university.events.api.dto.event.UpdateEventRequest;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Event service interface
  */
 public interface EventService {
     
-    EventDto createEvent(CreateEventRequest request);
+    EventDto createEvent(CreateEventRequest request, MultipartFile image);
     
     EventDto getEventById(Long id);
     

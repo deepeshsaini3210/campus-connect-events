@@ -65,9 +65,6 @@ public class CreateEventRequest {
     private Boolean isFeatured = false;
     private Boolean isPartnerEvent = false;
     
-    @Size(max = 500, message = "Image URL cannot exceed 500 characters")
-    private String imageUrl;
-    
     @Size(max = 5, message = "Maximum 5 highlights allowed")
     private List<@NotBlank(message = "Highlight cannot be blank") @Size(max = 255, message = "Highlight cannot exceed 255 characters") String> highlights;
 }

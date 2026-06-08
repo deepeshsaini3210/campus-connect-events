@@ -1,44 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ArrowRight, Calendar, Users, Trophy, Sparkles, Search, GraduationCap, Quote, CheckCircle2, X } from "lucide-react";
+import { useMemo } from "react";
+import { ArrowRight, Calendar, Users, Trophy, Sparkles, Search, GraduationCap, Quote, CheckCircle2 } from "lucide-react";
 import heroImg from "@/assets/hero-events.jpg";
-import { events, categories, partnerColleges, collaborationOffers, testimonials, type CollegeEvent } from "@/lib/events-data";
+import type { CollegeEvent } from "@/lib/events-data";
 import { EventCard } from "@/components/site/EventCard";
 import { fetchFeaturedEvents, fetchUpcomingEvents } from "@/lib/api/events";
 import { fetchCollaborationOffers, fetchPartnerColleges, fetchTestimonials } from "@/lib/api/public-content";
 import { formatCalendarDateMedium } from "@/lib/format-calendar-date";
-import { fetchGallery } from "@/lib/api/gallery";
-
 export const Route = createFileRoute("/")({
   loader: async () => {
-    try {
-      const [apiFeatured, apiUpcoming, apiPartners, apiOffers, apiTestimonials, apiGallery] = await Promise.all([
-        fetchFeaturedEvents({ page: 0, size: 12 }).catch(() => [] as CollegeEvent[]),
-        fetchUpcomingEvents({ page: 0, size: 12 }).catch(() => [] as CollegeEvent[]),
-        fetchPartnerColleges().catch(() => partnerColleges.map((p, i) => ({ id: i + 1, name: p.name, code: p.name, activeOffers: p.offers }))),
-        fetchCollaborationOffers().catch(() => collaborationOffers.map((o, i) => ({ collaborationId: i + 1, college: o.college, offer: o.offer, validity: o.validity }))),
-        fetchTestimonials().catch(() => testimonials.map((t, i) => ({ id: i + 1, name: t.name, role: t.role, quote: t.quote }))),
-        fetchGallery({ size: 24 }).catch(() => []),
-      ]);
-      let featured = apiFeatured;
-      let upcoming = apiUpcoming;
-      if (featured.length === 0) {
-        featured = events.filter((e) => e.featured);
-      }
-      if (upcoming.length === 0) {
-        upcoming = [...events].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
-      }
-      return { featured, upcoming, partners: apiPartners, offers: apiOffers, testimonials: apiTestimonials, gallery: apiGallery };
-    } catch {
-      return {
-        featured: events.filter((e) => e.featured),
-        upcoming: [...events].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6),
-        partners: partnerColleges.map((p, i) => ({ id: i + 1, name: p.name, code: p.name, activeOffers: p.offers })),
-        offers: collaborationOffers.map((o, i) => ({ collaborationId: i + 1, college: o.college, offer: o.offer, validity: o.validity })),
-        testimonials: testimonials.map((t, i) => ({ id: i + 1, name: t.name, role: t.role, quote: t.quote })),
-        gallery: [],
-      };
-    }
+    const [featured, upcoming, partners, offers, testimonials] = await Promise.all([
+      fetchFeaturedEvents({ page: 0, size: 12 }).catch(() => [] as CollegeEvent[]),
+      fetchUpcomingEvents({ page: 0, size: 12 }).catch(() => [] as CollegeEvent[]),
+      fetchPartnerColleges().catch(() => []),
+      fetchCollaborationOffers().catch(() => []),
+      fetchTestimonials().catch(() => []),
+    ]);
+    return { featured, upcoming, partners, offers, testimonials };
   },
   head: () => ({
     meta: [
@@ -50,21 +28,10 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { featured, upcoming, partners, offers, testimonials: voices, gallery } = Route.useLoaderData();
-  const [galleryCategory, setGalleryCategory] = useState("All");
-  const [selectedImage, setSelectedImage] = useState<null | typeof gallery[number]>(null);
-  const categoryItems = useMemo(() => {
-    const all = Array.from(new Set(gallery.map(g => g.category).filter(Boolean)));
-    return ["All", ...all];
-  }, [gallery]);
-  const filteredGallery = useMemo(
-    () => gallery.filter(g => galleryCategory === "All" || g.category === galleryCategory),
-    [gallery, galleryCategory],
-  );
+  const { featured, upcoming, partners, offers, testimonials: voices } = Route.useLoaderData();
 
   const categoryLabels = useMemo(() => {
-    const fromEvents = Array.from(new Set([...featured.map((e) => e.category), ...upcoming.map((e) => e.category)]));
-    return fromEvents.length > 0 ? fromEvents : categories;
+    return Array.from(new Set([...featured.map((e) => e.category), ...upcoming.map((e) => e.category)]));
   }, [featured, upcoming]);
 
   return (
@@ -134,6 +101,9 @@ function HomePage() {
             </div>
             <Link to="/events" className="text-sm font-semibold text-primary hover:underline">View all events →</Link>
           </div>
+          {categoryLabels.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Categories will appear when events are published.</p>
+          ) : (
           <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3">
             {categoryLabels.map(c => (
               <Link key={c} to="/events" search={{ category: c }} className="bg-card border border-border hover:border-primary hover:bg-primary/5 transition rounded-lg px-3 py-4 text-center text-xs font-semibold">
@@ -141,6 +111,7 @@ function HomePage() {
               </Link>
             ))}
           </div>
+          )}
         </div>
       </section>
 
@@ -153,9 +124,15 @@ function HomePage() {
               <h2 className="font-display text-3xl md:text-4xl font-bold">Featured Events</h2>
             </div>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featured.map(e => <EventCard key={e.id} event={e} />)}
-          </div>
+          {featured.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No featured events in the database yet.</p>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featured.map((e) => (
+                <EventCard key={e.id} event={e} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -169,9 +146,15 @@ function HomePage() {
             </div>
             <Link to="/calendar" className="text-sm font-semibold text-primary hover:underline">Calendar view →</Link>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {upcoming.map(e => <EventCard key={e.id} event={e} />)}
-          </div>
+          {upcoming.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No upcoming events in the database yet.</p>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {upcoming.map((e) => (
+                <EventCard key={e.id} event={e} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -183,6 +166,9 @@ function HomePage() {
             <h2 className="font-display text-3xl md:text-4xl font-bold mb-3">Partner Colleges</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">We collaborate with India's top institutions to bring exclusive opportunities to our students.</p>
           </div>
+          {partners.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground">No partner colleges yet — submit a collaboration request.</p>
+          ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {partners.map(p => (
               <div key={p.name} className="bg-card border border-border rounded-xl p-6 text-center hover:border-primary hover:shadow-card transition">
@@ -194,6 +180,7 @@ function HomePage() {
               </div>
             ))}
           </div>
+          )}
         </div>
       </section>
 
@@ -214,6 +201,9 @@ function HomePage() {
               </Link>
             </div>
             <div className="space-y-3">
+              {offers.length === 0 ? (
+                <p className="text-sm opacity-70">No approved collaboration offers yet.</p>
+              ) : null}
               {offers.map((o) => (
                 <div key={o.collaborationId} className="bg-white/5 border border-white/10 rounded-xl p-5 hover:border-primary/50 transition">
                   <div className="flex items-start gap-4">
@@ -233,63 +223,6 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Event Gallery */}
-      <section className="py-20 bg-secondary/30 border-y border-border">
-        <div className="container-page">
-          <div className="text-center mb-10">
-            <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Campus Gallery</p>
-            <h2 className="font-display text-3xl md:text-4xl font-bold mb-3">Event Memories & Campus Highlights</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Explore the success stories and memorable moments from our past events.
-            </p>
-          </div>
-
-          {gallery.length > 0 ? (
-            <>
-              <div className="flex flex-wrap justify-center gap-2 mb-8">
-                {categoryItems.map((cat) => (
-                  <button
-                    type="button"
-                    key={cat}
-                    onClick={() => setGalleryCategory(cat)}
-                    className={`px-4 py-2 rounded-full text-xs font-semibold border transition ${
-                      galleryCategory === cat
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card border-border hover:border-primary hover:text-primary"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredGallery.map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    onClick={() => setSelectedImage(item)}
-                    className="text-left group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-elegant hover:border-primary/40 transition"
-                  >
-                    <div className="aspect-[4/3] overflow-hidden">
-                      <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover group-hover:scale-105 transition duration-500" />
-                    </div>
-                    <div className="p-5">
-                      <div className="text-[10px] uppercase tracking-widest text-primary font-semibold mb-2">{item.category} · {formatCalendarDateMedium(item.eventDate)}</div>
-                      <h3 className="font-display text-lg font-bold mb-1 line-clamp-1">{item.title}</h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{item.description || item.eventTitle || "Campus highlight from our university ecosystem."}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-2xl bg-card/50">
-              Gallery will appear here once admins upload event media.
-            </div>
-          )}
-        </div>
-      </section>
-
       {/* Testimonials */}
       <section className="py-20">
         <div className="container-page">
@@ -297,6 +230,9 @@ function HomePage() {
             <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Voices from campus</p>
             <h2 className="font-display text-3xl md:text-4xl font-bold">What students say</h2>
           </div>
+          {voices.length === 0 ? (
+            <p className="text-center text-muted-foreground">No testimonials in the database yet.</p>
+          ) : (
           <div className="grid md:grid-cols-3 gap-6">
             {voices.map((t) => (
               <div key={t.id} className="bg-card border border-border rounded-2xl p-7 shadow-card">
@@ -314,6 +250,7 @@ function HomePage() {
               </div>
             ))}
           </div>
+          )}
         </div>
       </section>
 
@@ -329,27 +266,6 @@ function HomePage() {
         </div>
       </section>
 
-      {selectedImage ? (
-        <div
-          className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
-        >
-          <div className="max-w-5xl w-full bg-card border border-border rounded-2xl overflow-hidden">
-            <div className="relative aspect-[16/9] bg-black">
-              <img src={selectedImage.imageUrl} alt={selectedImage.title} className="w-full h-full object-contain" />
-              <button type="button" className="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white rounded-full p-2" onClick={() => setSelectedImage(null)}>
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="p-6">
-              <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">
-                {selectedImage.category} · {formatCalendarDateMedium(selectedImage.eventDate)}
-              </p>
-              <h3 className="font-display text-2xl font-bold mb-2">{selectedImage.title}</h3>
-              <p className="text-muted-foreground">{selectedImage.description || selectedImage.eventTitle || "University event moment."}</p>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </>
   );
 }

@@ -45,4 +45,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     
     @Query("SELECT b FROM Booking b WHERE b.paymentStatus = :paymentStatus")
     Page<Booking> findByPaymentStatus(@Param("paymentStatus") Booking.PaymentStatus paymentStatus, Pageable pageable);
+
+    @Query("SELECT b FROM Booking b JOIN FETCH b.user u JOIN FETCH b.event e WHERE b.bookingReference = :reference")
+    java.util.Optional<Booking> findByBookingReferenceWithUser(@Param("reference") String reference);
+
+    @Query("SELECT b FROM Booking b JOIN FETCH b.user u WHERE b.event.id = :eventId AND b.paymentStatus = 'COMPLETED' AND b.status <> 'CANCELLED' ORDER BY u.firstName, u.lastName")
+    java.util.List<Booking> findPaidRegistrantsByEventId(@Param("eventId") Long eventId);
+
+    @Query("SELECT b FROM Booking b JOIN FETCH b.user u WHERE b.event.id = :eventId AND b.paymentStatus = 'COMPLETED' AND b.status <> 'CANCELLED' AND (LOWER(u.email) LIKE LOWER(CONCAT('%', :q, '%')) OR LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) OR LOWER(COALESCE(u.rollNumber, '')) LIKE LOWER(CONCAT('%', :q, '%'))) ORDER BY u.firstName, u.lastName")
+    java.util.List<Booking> searchPaidRegistrantsByEventId(@Param("eventId") Long eventId, @Param("q") String q);
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.event.id = :eventId AND b.paymentStatus = 'COMPLETED' AND b.status <> 'CANCELLED'")
+    long countPaidRegistrantsByEventId(@Param("eventId") Long eventId);
 }

@@ -30,6 +30,7 @@ public class AuthResponse {
         private String firstName;
         private String lastName;
         private String phone;
+        private String rollNumber;
         private String profileImage;
         private String role;
         private String collegeName;

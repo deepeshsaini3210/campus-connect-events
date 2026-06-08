@@ -26,7 +26,7 @@ public class MailAuthNotificationService implements AuthNotificationService {
     @Value("${app.mail.from:noreply@localhost}")
     private String mailFrom;
 
-    @Value("${app.frontend-base-url:http://localhost:5173}")
+    @Value("${app.frontend-base-url:http://localhost:8080}")
     private String frontendBaseUrl;
 
     @Override

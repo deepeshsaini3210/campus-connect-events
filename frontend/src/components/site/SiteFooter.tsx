@@ -1,9 +1,25 @@
 import { GraduationCap, Mail, Phone, MapPin } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { authService, AUTH_CHANGED_EVENT } from "@/lib/api/auth";
+import { canAccessStudentDashboard } from "@/lib/auth/roles";
 
 export function SiteFooter() {
+  const [showStudentLinks, setShowStudentLinks] = useState(false);
+
+  useEffect(() => {
+    const update = () => {
+      const role = authService.getCurrentUser()?.role;
+      setShowStudentLinks(
+        authService.isAuthenticated() && canAccessStudentDashboard(role),
+      );
+    };
+    update();
+    window.addEventListener(AUTH_CHANGED_EVENT, update);
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, update);
+  }, []);
   return (
-    <footer className="bg-ink text-ink-foreground mt-20">
+    <footer className="bg-ink text-ink-foreground mt-auto shrink-0">
       <div className="container-page py-14 grid grid-cols-1 md:grid-cols-4 gap-10">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -25,9 +41,11 @@ export function SiteFooter() {
           <ul className="space-y-2 text-sm opacity-80">
             <li><Link to="/events" className="hover:text-primary">All Events</Link></li>
             <li><Link to="/calendar" className="hover:text-primary">Event Calendar</Link></li>
-            <li><Link to="/gallery" className="hover:text-primary">Event Gallery</Link></li>
+            <li><Link to="/events" className="hover:text-primary">Browse Events</Link></li>
             <li><Link to="/collaborate" className="hover:text-primary">Collaboration Portal</Link></li>
-            <li><Link to="/dashboard" className="hover:text-primary">My Bookings</Link></li>
+            {showStudentLinks ? (
+              <li><Link to="/dashboard" className="hover:text-primary">My Bookings</Link></li>
+            ) : null}
           </ul>
         </div>
 

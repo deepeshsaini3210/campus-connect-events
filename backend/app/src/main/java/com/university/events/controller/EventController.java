@@ -14,8 +14,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -29,16 +31,22 @@ public class EventController {
     
     private final EventService eventService;
     
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'COLLEGE_ADMIN', 'SUPER_ADMIN')")
-    @Operation(summary = "Create a new event", description = "Create a new event with details")
+    @Operation(summary = "Create a new event", description = "Create event with required poster image (stored in MinIO)")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Event created successfully"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid input data"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid input data or missing image"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Insufficient permissions")
     })
-    public ResponseEntity<ApiResponse<EventDto>> createEvent(@Valid @RequestBody CreateEventRequest request) {
-        EventDto event = eventService.createEvent(request);
+    public ResponseEntity<ApiResponse<EventDto>> createEvent(
+            @Valid @RequestPart("event") CreateEventRequest request,
+            @RequestPart("image") MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Event poster image is required", HttpStatus.BAD_REQUEST));
+        }
+        EventDto event = eventService.createEvent(request, image);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(event));
     }
     
@@ -140,6 +148,6 @@ public class EventController {
             @Parameter(description = "Event ID") @PathVariable Long id,
             @Parameter(description = "Rejection reason") @RequestParam("reason") String reason) {
         eventService.rejectEvent(id, reason);
-        return ResponseEntity.ok(ApiResponse.success(null, "Event rejected successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Event rejected and deleted successfully"));
     }
 }

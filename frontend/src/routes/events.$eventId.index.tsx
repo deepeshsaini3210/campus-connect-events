@@ -1,31 +1,15 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { Calendar, MapPin, Users, Clock, Building2, IndianRupee, ArrowRight, CheckCircle2, Share2 } from "lucide-react";
-import { events, type CollegeEvent } from "@/lib/events-data";
+import type { CollegeEvent } from "@/lib/events-data";
 import { EventCard } from "@/components/site/EventCard";
 import { fetchEventById, fetchEvents } from "@/lib/api/events";
 import { formatCalendarDateMedium, formatCalendarDayMonth } from "@/lib/format-calendar-date";
 
 export const Route = createFileRoute("/events/$eventId/")({
   loader: async ({ params }) => {
-    let event: CollegeEvent | null = null;
-    try {
-      event = await fetchEventById(params.eventId);
-    } catch {
-      event = null;
-    }
-    let allEvents: CollegeEvent[] = events;
-    try {
-      const api = await fetchEvents({ page: 0, size: 80 });
-      if (api.length > 0) allEvents = api;
-    } catch {
-      /* keep static list */
-    }
-    if (!event) {
-      const fallbackEvent = events.find(e => e.id === params.eventId);
-      if (!fallbackEvent) throw notFound();
-      return { event: fallbackEvent, allEvents };
-    }
+    const event = await fetchEventById(params.eventId);
+    const allEvents = await fetchEvents({ page: 0, size: 80 }).catch(() => [] as CollegeEvent[]);
     return { event, allEvents };
   },
   head: ({ loaderData }) => ({

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { createEvent, type CreateEventPayload, uploadEventImage } from "@/lib/api/events";
+import { createEvent, type CreateEventPayload } from "@/lib/api/events";
 import { Loader2 } from "lucide-react";
 
 const CATEGORIES: { id: number; name: string }[] = [
@@ -54,8 +54,8 @@ export function CreateEventDialog({ open, onOpenChange, onCreated }: Props) {
   const [deadline, setDeadline] = useState(isoDatePlusDays(7));
   const [isFeatured, setIsFeatured] = useState(false);
   const [isPartnerEvent, setIsPartnerEvent] = useState(false);
-  const [imageUrl, setImageUrl] = useState("");
-  const [imageUploading, setImageUploading] = useState(false);
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [posterPreview, setPosterPreview] = useState<string | null>(null);
   const [highlightsText, setHighlightsText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -79,11 +79,18 @@ export function CreateEventDialog({ open, onOpenChange, onCreated }: Props) {
     setDeadline(isoDatePlusDays(7));
     setIsFeatured(false);
     setIsPartnerEvent(false);
-    setImageUrl("");
-    setImageUploading(false);
+    setPosterFile(null);
+    if (posterPreview) URL.revokeObjectURL(posterPreview);
+    setPosterPreview(null);
     setHighlightsText("");
     setError("");
   }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (posterPreview) URL.revokeObjectURL(posterPreview);
+    };
+  }, [posterPreview]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -98,6 +105,10 @@ export function CreateEventDialog({ open, onOpenChange, onCreated }: Props) {
     }
     if (venue.trim().length < 5) {
       setError("Venue must be at least 5 characters.");
+      return;
+    }
+    if (!posterFile) {
+      setError("Event poster image is required.");
       return;
     }
     const highlights = highlightsText
@@ -118,12 +129,11 @@ export function CreateEventDialog({ open, onOpenChange, onCreated }: Props) {
       deadline,
       isFeatured,
       isPartnerEvent,
-      imageUrl: imageUrl.trim() || undefined,
       highlights: highlights.length ? highlights : undefined,
     };
     setLoading(true);
     try {
-      await createEvent(payload);
+      await createEvent(payload, posterFile);
       onCreated();
       onOpenChange(false);
     } catch (err) {
@@ -139,8 +149,8 @@ export function CreateEventDialog({ open, onOpenChange, onCreated }: Props) {
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Create event</DialogTitle>
           <DialogDescription>
-            New events are saved as drafts in the backend. Sign in as College Admin, Event Organizer, or Super Admin to
-            submit this form.
+            New events are saved as drafts in the backend. A poster image is required (uploaded to MinIO). Sign in as
+            College Admin, Event Organizer, or Super Admin to submit.
           </DialogDescription>
         </DialogHeader>
 
@@ -231,45 +241,48 @@ export function CreateEventDialog({ open, onOpenChange, onCreated }: Props) {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ce-img-file">Event poster (MinIO upload)</Label>
+            <Label htmlFor="ce-img-file">Event poster (required)</Label>
             <Input
               id="ce-img-file"
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
-              disabled={!hasToken || imageUploading}
-              onChange={async (e) => {
+              required
+              disabled={!hasToken}
+              onChange={(e) => {
                 const f = e.target.files?.[0];
-                e.target.value = "";
-                if (!f) return;
-                setError("");
-                setImageUploading(true);
-                try {
-                  const url = await uploadEventImage(f);
-                  setImageUrl(url);
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : "Image upload failed.");
-                } finally {
-                  setImageUploading(false);
+                if (!f) {
+                  setPosterFile(null);
+                  if (posterPreview) URL.revokeObjectURL(posterPreview);
+                  setPosterPreview(null);
+                  return;
                 }
+                setError("");
+                setPosterFile(f);
+                if (posterPreview) URL.revokeObjectURL(posterPreview);
+                setPosterPreview(URL.createObjectURL(f));
               }}
             />
             <p className="text-xs text-muted-foreground">
-              JPEG, PNG, WebP or GIF, max 5 MB. Requires MinIO running and{" "}
-              <code className="text-xs">minio.enabled=true</code> on the server.
+              JPEG, PNG, WebP or GIF, max 5 MB. Uploaded to MinIO when you create the event.
             </p>
-            {imageUrl ? (
+            {posterPreview ? (
               <div className="flex items-center gap-3 rounded-lg border border-border p-2 bg-secondary/30">
-                <img src={imageUrl} alt="Poster preview" className="h-16 w-24 rounded object-cover" />
-                <span className="text-xs text-muted-foreground break-all flex-1">{imageUrl}</span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setImageUrl("")}>
+                <img src={posterPreview} alt="Poster preview" className="h-16 w-24 rounded object-cover" />
+                <span className="text-xs text-muted-foreground flex-1">{posterFile?.name}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setPosterFile(null);
+                    if (posterPreview) URL.revokeObjectURL(posterPreview);
+                    setPosterPreview(null);
+                  }}
+                >
                   Clear
                 </Button>
               </div>
             ) : null}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="ce-img">Or paste image URL (optional)</Label>
-            <Input id="ce-img" type="url" placeholder="https://…" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="ce-high">Highlights (optional, max 5 lines)</Label>
@@ -300,11 +313,9 @@ export function CreateEventDialog({ open, onOpenChange, onCreated }: Props) {
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !hasToken || imageUploading}>
-              {(loading || imageUploading) ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {loading ? "Saving…" : imageUploading ? "Uploading image…" : "Create event"}
+            <Button type="submit" disabled={loading || !hasToken || !posterFile}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {loading ? "Saving…" : "Create event"}
             </Button>
           </DialogFooter>
         </form>

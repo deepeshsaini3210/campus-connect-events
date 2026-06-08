@@ -20,8 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.university.events.service.security.UserPrincipal;
+import com.university.events.service.storage.EventImageStorageService;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,6 +41,7 @@ public class EventServiceImpl implements EventService {
     private static final String CATEGORY_NOT_FOUND = "Category not found";
     private static final String ORGANIZER_NOT_FOUND = "Organizer not found";
     private static final String COLLEGE_NOT_FOUND = "College not found";
+    private static final String IMAGE_REQUIRED = "Event poster image is required";
     
     private final EventRepository eventRepository;
     private final EventCategoryRepository categoryRepository;
@@ -45,6 +49,7 @@ public class EventServiceImpl implements EventService {
     private final UserRepository userRepository;
     private final EventHighlightRepository highlightRepository;
     private final EventMapper eventMapper;
+    private final EventImageStorageService eventImageStorageService;
 
     private static final String NOT_AUTHENTICATED = "User is not authenticated";
 
@@ -59,7 +64,11 @@ public class EventServiceImpl implements EventService {
     
     @Override
     @Transactional
-    public EventDto createEvent(CreateEventRequest request) {
+    public EventDto createEvent(CreateEventRequest request, MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            throw new IllegalArgumentException(IMAGE_REQUIRED);
+        }
+
         log.info("Creating new event: {}", request.getTitle());
         
         // Validate category
@@ -79,7 +88,23 @@ public class EventServiceImpl implements EventService {
         event.setCategory(category);
         event.setOrganizer(organizer);
         event.setCollege(college);
-        
+
+        try {
+            String imageUrl = eventImageStorageService.upload(
+                    image.getInputStream(),
+                    image.getSize(),
+                    image.getContentType(),
+                    image.getOriginalFilename());
+            event.setImageUrl(imageUrl);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RuntimeException("Could not process event image upload", ex);
+        }
+
+        ensureEventTimestamps(event);
+        event.setStatus(Event.EventStatus.PENDING_APPROVAL);
+
         // Save event
         Event savedEvent = eventRepository.save(event);
         
@@ -211,6 +236,8 @@ public class EventServiceImpl implements EventService {
             }
         }
         
+        ensureEventTimestamps(event);
+
         Event updatedEvent = eventRepository.save(event);
         log.info("Event updated successfully: {}", updatedEvent.getId());
         
@@ -255,11 +282,19 @@ public class EventServiceImpl implements EventService {
         
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException(EVENT_NOT_FOUND));
-        
-        event.setStatus(Event.EventStatus.REJECTED);
-        eventRepository.save(event);
-        
-        log.info("Event rejected successfully: {}", id);
+
+        eventRepository.delete(event);
+        log.info("Event rejected and deleted successfully: {}", id);
+    }
+
+    private static void ensureEventTimestamps(Event event) {
+        LocalDateTime now = LocalDateTime.now();
+        if (event.getCreatedAt() == null) {
+            event.setCreatedAt(now);
+        }
+        if (event.getUpdatedAt() == null) {
+            event.setUpdatedAt(now);
+        }
     }
 
     private static Event.EventMode parseModeOrNull(String raw) {

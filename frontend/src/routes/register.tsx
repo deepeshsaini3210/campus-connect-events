@@ -11,13 +11,11 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
 });
 
-/** Matches Spring `RegisterRequest`: roleId + optional collegeId */
+/** Signup roles only. SUPER_ADMIN is created in the database — not listed here. */
 const ROLE_OPTIONS = [
-  { id: 1, label: "Student" },
-  { id: 2, label: "College Admin" },
-  { id: 3, label: "Event Organizer" },
-  { id: 4, label: "External Partner" },
-  { id: 5, label: "Super Admin" },
+  { id: 1, label: "Student", hint: "Home, Events, Calendar, Student Dashboard" },
+  { id: 3, label: "Event Organizer", hint: "Home, Events, Calendar, Organizer Dashboard" },
+  { id: 6, label: "Event Member", hint: "Home, Events, Calendar, Onboarding (venue check-in)" },
 ] as const;
 
 const COLLEGE_OPTIONS = [
@@ -56,7 +54,7 @@ function RegisterPage() {
         roleId,
         collegeId,
       });
-      if (res.success && res.data) {
+      if (res.success) {
         navigate({
           to: "/verify-email",
           search: { registered: "1" },
@@ -72,7 +70,7 @@ function RegisterPage() {
   return (
     <AuthShell
       title="Sign up"
-      subtitle="Create your MU Events account. You’ll confirm your email before full access — check the server logs for the link in development."
+      subtitle="Create your MU Events account. We’ll email you a verification link — sign in only after you verify."
     >
       <div className="bg-card border border-border rounded-2xl shadow-card p-6 sm:p-8">
         <form onSubmit={onSubmit} className="space-y-4">
@@ -151,6 +149,9 @@ function RegisterPage() {
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {ROLE_OPTIONS.find((r) => r.id === roleId)?.hint}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="college">College</Label>

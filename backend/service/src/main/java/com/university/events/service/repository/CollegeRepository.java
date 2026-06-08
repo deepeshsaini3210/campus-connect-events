@@ -42,6 +42,9 @@ public interface CollegeRepository extends JpaRepository<College, Long> {
     
     @Query("SELECT c FROM College c WHERE c.isActive = true ORDER BY c.name")
     List<College> findAllActiveColleges();
+
+    @Query("SELECT c FROM College c WHERE LOWER(TRIM(c.name)) = LOWER(TRIM(:name))")
+    Optional<College> findByNameIgnoreCase(@Param("name") String name);
     
     @Query("SELECT COUNT(c) FROM College c WHERE c.city = :city AND c.isActive = true")
     long countByCity(@Param("city") String city);

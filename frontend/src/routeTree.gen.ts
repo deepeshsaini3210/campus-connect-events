@@ -13,16 +13,18 @@ import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CollaborateRouteImport } from './routes/collaborate'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OnboardingIndexRouteImport } from './routes/onboarding.index'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
+import { Route as OnboardingEventIdIndexRouteImport } from './routes/onboarding.$eventId.index'
 import { Route as EventsEventIdIndexRouteImport } from './routes/events.$eventId.index'
 import { Route as EventsEventIdRegisterRouteImport } from './routes/events.$eventId.register'
+import { Route as OnboardingEventIdCheckInUserIdRouteImport } from './routes/onboarding.$eventId.check-in.$userId'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
@@ -42,11 +44,6 @@ const RegisterRoute = RegisterRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GalleryRoute = GalleryRouteImport.update({
-  id: '/gallery',
-  path: '/gallery',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -79,9 +76,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingIndexRoute = OnboardingIndexRouteImport.update({
+  id: '/onboarding/',
+  path: '/onboarding/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventsIndexRoute = EventsIndexRouteImport.update({
   id: '/events/',
   path: '/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingEventIdIndexRoute = OnboardingEventIdIndexRouteImport.update({
+  id: '/onboarding/$eventId/',
+  path: '/onboarding/$eventId/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsEventIdIndexRoute = EventsEventIdIndexRouteImport.update({
@@ -94,6 +101,12 @@ const EventsEventIdRegisterRoute = EventsEventIdRegisterRouteImport.update({
   path: '/events/$eventId/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingEventIdCheckInUserIdRoute =
+  OnboardingEventIdCheckInUserIdRouteImport.update({
+    id: '/onboarding/$eventId/check-in/$userId',
+    path: '/onboarding/$eventId/check-in/$userId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -102,14 +115,16 @@ export interface FileRoutesByFullPath {
   '/collaborate': typeof CollaborateRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
-  '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
   '/events/': typeof EventsIndexRoute
+  '/onboarding/': typeof OnboardingIndexRoute
   '/events/$eventId/register': typeof EventsEventIdRegisterRoute
   '/events/$eventId/': typeof EventsEventIdIndexRoute
+  '/onboarding/$eventId/': typeof OnboardingEventIdIndexRoute
+  '/onboarding/$eventId/check-in/$userId': typeof OnboardingEventIdCheckInUserIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -118,14 +133,16 @@ export interface FileRoutesByTo {
   '/collaborate': typeof CollaborateRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
-  '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
   '/events': typeof EventsIndexRoute
+  '/onboarding': typeof OnboardingIndexRoute
   '/events/$eventId/register': typeof EventsEventIdRegisterRoute
   '/events/$eventId': typeof EventsEventIdIndexRoute
+  '/onboarding/$eventId': typeof OnboardingEventIdIndexRoute
+  '/onboarding/$eventId/check-in/$userId': typeof OnboardingEventIdCheckInUserIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -135,14 +152,16 @@ export interface FileRoutesById {
   '/collaborate': typeof CollaborateRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
-  '/gallery': typeof GalleryRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
   '/events/': typeof EventsIndexRoute
+  '/onboarding/': typeof OnboardingIndexRoute
   '/events/$eventId/register': typeof EventsEventIdRegisterRoute
   '/events/$eventId/': typeof EventsEventIdIndexRoute
+  '/onboarding/$eventId/': typeof OnboardingEventIdIndexRoute
+  '/onboarding/$eventId/check-in/$userId': typeof OnboardingEventIdCheckInUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -153,14 +172,16 @@ export interface FileRouteTypes {
     | '/collaborate'
     | '/dashboard'
     | '/forgot-password'
-    | '/gallery'
     | '/login'
     | '/register'
     | '/reset-password'
     | '/verify-email'
     | '/events/'
+    | '/onboarding/'
     | '/events/$eventId/register'
     | '/events/$eventId/'
+    | '/onboarding/$eventId/'
+    | '/onboarding/$eventId/check-in/$userId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -169,14 +190,16 @@ export interface FileRouteTypes {
     | '/collaborate'
     | '/dashboard'
     | '/forgot-password'
-    | '/gallery'
     | '/login'
     | '/register'
     | '/reset-password'
     | '/verify-email'
     | '/events'
+    | '/onboarding'
     | '/events/$eventId/register'
     | '/events/$eventId'
+    | '/onboarding/$eventId'
+    | '/onboarding/$eventId/check-in/$userId'
   id:
     | '__root__'
     | '/'
@@ -185,14 +208,16 @@ export interface FileRouteTypes {
     | '/collaborate'
     | '/dashboard'
     | '/forgot-password'
-    | '/gallery'
     | '/login'
     | '/register'
     | '/reset-password'
     | '/verify-email'
     | '/events/'
+    | '/onboarding/'
     | '/events/$eventId/register'
     | '/events/$eventId/'
+    | '/onboarding/$eventId/'
+    | '/onboarding/$eventId/check-in/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -202,14 +227,16 @@ export interface RootRouteChildren {
   CollaborateRoute: typeof CollaborateRoute
   DashboardRoute: typeof DashboardRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
-  GalleryRoute: typeof GalleryRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   EventsIndexRoute: typeof EventsIndexRoute
+  OnboardingIndexRoute: typeof OnboardingIndexRoute
   EventsEventIdRegisterRoute: typeof EventsEventIdRegisterRoute
   EventsEventIdIndexRoute: typeof EventsEventIdIndexRoute
+  OnboardingEventIdIndexRoute: typeof OnboardingEventIdIndexRoute
+  OnboardingEventIdCheckInUserIdRoute: typeof OnboardingEventIdCheckInUserIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -240,13 +267,6 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/gallery': {
-      id: '/gallery'
-      path: '/gallery'
-      fullPath: '/gallery'
-      preLoaderRoute: typeof GalleryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -291,11 +311,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/': {
+      id: '/onboarding/'
+      path: '/onboarding'
+      fullPath: '/onboarding/'
+      preLoaderRoute: typeof OnboardingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/events/': {
       id: '/events/'
       path: '/events'
       fullPath: '/events/'
       preLoaderRoute: typeof EventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/$eventId/': {
+      id: '/onboarding/$eventId/'
+      path: '/onboarding/$eventId'
+      fullPath: '/onboarding/$eventId/'
+      preLoaderRoute: typeof OnboardingEventIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events/$eventId/': {
@@ -312,6 +346,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventsEventIdRegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/$eventId/check-in/$userId': {
+      id: '/onboarding/$eventId/check-in/$userId'
+      path: '/onboarding/$eventId/check-in/$userId'
+      fullPath: '/onboarding/$eventId/check-in/$userId'
+      preLoaderRoute: typeof OnboardingEventIdCheckInUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -322,14 +363,16 @@ const rootRouteChildren: RootRouteChildren = {
   CollaborateRoute: CollaborateRoute,
   DashboardRoute: DashboardRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
-  GalleryRoute: GalleryRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   EventsIndexRoute: EventsIndexRoute,
+  OnboardingIndexRoute: OnboardingIndexRoute,
   EventsEventIdRegisterRoute: EventsEventIdRegisterRoute,
   EventsEventIdIndexRoute: EventsEventIdIndexRoute,
+  OnboardingEventIdIndexRoute: OnboardingEventIdIndexRoute,
+  OnboardingEventIdCheckInUserIdRoute: OnboardingEventIdCheckInUserIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

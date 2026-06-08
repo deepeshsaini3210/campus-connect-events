@@ -1,0 +1,16 @@
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/EventDiscoveryApplication.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/bootstrap/AuthReferenceDataBootstrap.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/bootstrap/SuperAdminUserBootstrap.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/config/CustomUserDetailsService.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/config/JwtAuthenticationFilter.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/config/SecurityConfig.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/controller/AuthController.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/controller/BookingController.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/controller/CollaborationController.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/controller/EventController.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/controller/EventImageUploadController.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/controller/GalleryController.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/controller/NotificationController.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/controller/OnboardingController.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/controller/PublicContentController.java
+/Users/ent-0530/Desktop/major-project/backend/app/src/main/java/com/university/events/exception/GlobalExceptionHandler.java

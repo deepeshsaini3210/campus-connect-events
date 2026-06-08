@@ -38,8 +38,9 @@ public class AuthReferenceDataBootstrap implements ApplicationRunner {
         ensureRole("STUDENT", "Regular student user");
         ensureRole("COLLEGE_ADMIN", "College administrator");
         ensureRole("EVENT_ORGANIZER", "Event organizer");
+        ensureRole("EVENT_MEMBER", "Onboarding / venue check-in team member");
         ensureRole("EXTERNAL_PARTNER", "External college partner");
-        ensureRole("SUPER_ADMIN", "System super administrator");
+        ensureRole("SUPER_ADMIN", "System super administrator — full access, database signup only");
     }
 
     private void ensureRole(String name, String description) {

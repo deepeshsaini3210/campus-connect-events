@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -41,6 +42,13 @@ public class AuthServiceImpl implements AuthService {
     private static final String EMAIL_EXISTS = "Email already exists";
     private static final String ACCOUNT_DISABLED = "Account is disabled";
     private static final String INVALID_OR_EXPIRED_TOKEN = "Invalid or expired token";
+    private static final String EMAIL_NOT_VERIFIED = "Please verify your email before signing in. Check your inbox for the verification link.";
+    /** Roles allowed on public signup — SUPER_ADMIN and others are DB-only */
+    private static final Set<String> SELF_SIGNUP_ROLE_NAMES = Set.of(
+            "STUDENT",
+            "EVENT_ORGANIZER",
+            "EVENT_MEMBER"
+    );
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
@@ -66,11 +74,13 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException(EMAIL_EXISTS);
         }
 
-        if (!roleRepository.existsById(request.getRoleId())) {
-            throw new RuntimeException(ROLE_NOT_FOUND);
+        Role role = roleRepository.findById(request.getRoleId())
+                .orElseThrow(() -> new RuntimeException(ROLE_NOT_FOUND));
+        if (!SELF_SIGNUP_ROLE_NAMES.contains(role.getName())) {
+            throw new RuntimeException(
+                    "This account type cannot be created via signup. Contact the university IT team.");
         }
-        /* Reference-only association avoids loading Role.userRoles (prevents SO / deep cascades) */
-        Role roleRef = roleRepository.getReferenceById(request.getRoleId());
+        Role roleRef = role;
 
         User user = userMapper.toEntity(request);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
@@ -84,6 +94,8 @@ public class AuthServiceImpl implements AuthService {
             user.setPhone(null);
         }
 
+        user.setIsActive(false);
+
         String verificationToken = UUID.randomUUID().toString();
         user.setEmailVerificationToken(verificationToken);
         user.setEmailVerificationExpiresAt(LocalDateTime.now().plusHours(emailVerificationExpiryHours));
@@ -92,12 +104,9 @@ public class AuthServiceImpl implements AuthService {
 
         authNotificationService.sendEmailVerification(savedUser, verificationToken);
 
-        String accessToken = tokenProvider.generateAccessToken(savedUser);
-        String refreshToken = tokenProvider.generateRefreshToken(savedUser);
+        log.info("User registered (pending email verification): {}", request.getEmail());
 
-        log.info("User registered successfully: {}", request.getEmail());
-
-        return userMapper.toAuthResponse(savedUser, accessToken, refreshToken, tokenProvider.getExpirationInMs());
+        return userMapper.toAuthResponse(savedUser, null, null, null);
     }
 
     @Override
@@ -114,6 +123,10 @@ public class AuthServiceImpl implements AuthService {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
         User user = userRepository.findById(userPrincipal.getId())
                 .orElseThrow(() -> new RuntimeException(USER_NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new RuntimeException(EMAIL_NOT_VERIFIED);
+        }
 
         if (!user.getIsActive()) {
             throw new RuntimeException(ACCOUNT_DISABLED);
@@ -139,6 +152,10 @@ public class AuthServiceImpl implements AuthService {
         String email = tokenProvider.getEmailFromToken(refreshToken);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException(USER_NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new RuntimeException(EMAIL_NOT_VERIFIED);
+        }
 
         if (!user.getIsActive()) {
             throw new RuntimeException(ACCOUNT_DISABLED);
@@ -213,6 +230,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         user.setEmailVerified(true);
+        user.setIsActive(true);
         user.setEmailVerificationToken(null);
         user.setEmailVerificationExpiresAt(null);
         userRepository.save(user);

@@ -135,14 +135,19 @@ git clone <repository-url>
 cd backend
 ```
 
-2. Build the project:
+2. Build the project (must build all modules — `api` → `service` → `app`):
 ```bash
-mvn clean install
+mvn clean install -DskipTests
+```
+
+If you only need to compile without installing to `~/.m2`:
+```bash
+mvn clean compile -pl app -am -DskipTests
 ```
 
 3. Run the application:
 ```bash
-mvn spring-boot:run -pl app
+mvn spring-boot:run -pl app -am
 ```
 
 The application will start on `http://localhost:8080/api`

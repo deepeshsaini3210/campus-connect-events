@@ -20,6 +20,10 @@ public interface BookingService {
     void cancelBooking(Long id);
     
     void confirmBooking(Long id);
+
+    BookingDto completePayment(Long id);
+
+    BookingDto verifyEntryCode(String entryCode);
     
     void markAttended(Long id);
 }

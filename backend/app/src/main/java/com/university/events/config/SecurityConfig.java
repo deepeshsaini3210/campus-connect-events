@@ -68,6 +68,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/v1/events", "/v1/events/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/gallery", "/v1/gallery/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/public", "/v1/public/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/v1/bookings/verify/**").permitAll()
                 .requestMatchers("/api-docs/**").permitAll()
                 .requestMatchers("/swagger-ui/**").permitAll()
                 .requestMatchers("/swagger-ui.html").permitAll()

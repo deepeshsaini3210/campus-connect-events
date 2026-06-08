@@ -22,6 +22,7 @@ public class UserPrincipal implements UserDetails {
     private String password;
     private String role;
     private Long collegeId;
+    private boolean enabled;
     
     public static UserPrincipal create(User user) {
         return new UserPrincipal(
@@ -29,7 +30,8 @@ public class UserPrincipal implements UserDetails {
                 user.getEmail(),
                 user.getPasswordHash(),
                 user.getRole().getName(),
-                user.getCollege() != null ? user.getCollege().getId() : null
+                user.getCollege() != null ? user.getCollege().getId() : null,
+                Boolean.TRUE.equals(user.getIsActive()) && Boolean.TRUE.equals(user.getEmailVerified())
         );
     }
     
@@ -65,6 +67,6 @@ public class UserPrincipal implements UserDetails {
     
     @Override
     public boolean isEnabled() {
-        return true;
+        return enabled;
     }
 }

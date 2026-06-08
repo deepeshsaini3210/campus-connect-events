@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class LoggingAuthNotificationService implements AuthNotificationService {
 
-    @Value("${app.frontend-base-url:http://localhost:5173}")
+    @Value("${app.frontend-base-url:http://localhost:8080}")
     private String frontendBaseUrl;
 
     @Value("${app.backend-public-url:http://localhost:8081/api}")

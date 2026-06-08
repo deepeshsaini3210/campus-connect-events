@@ -13,8 +13,13 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -54,6 +59,15 @@ public class User {
 
     @Column(length = 20)
     private String phone;
+
+    @Column(name = "roll_number", length = 50)
+    private String rollNumber;
+
+    /** Active entry codes from paid registrations (one per booking). */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "entry_codes", columnDefinition = "json")
+    @Builder.Default
+    private List<String> entryCodes = new ArrayList<>();
 
     @Column(name = "profile_image", length = 500)
     private String profileImage;

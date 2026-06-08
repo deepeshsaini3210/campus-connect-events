@@ -10,8 +10,12 @@ public class CreateCollaborationRequest {
     @NotNull
     private Long requesterCollegeId;
 
-    @NotNull
+    /** Legacy: optional when partnerUniversityName is provided. */
     private Long partnerCollegeId;
+
+    @NotBlank
+    @Size(max = 255)
+    private String partnerUniversityName;
 
     @Size(max = 1000)
     private String notes;
