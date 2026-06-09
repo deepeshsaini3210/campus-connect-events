@@ -5,18 +5,23 @@ import heroImg from "@/assets/hero-events.jpg";
 import type { CollegeEvent } from "@/lib/events-data";
 import { EventCard } from "@/components/site/EventCard";
 import { fetchFeaturedEvents, fetchUpcomingEvents } from "@/lib/api/events";
-import { fetchCollaborationOffers, fetchPartnerColleges, fetchTestimonials } from "@/lib/api/public-content";
+import {
+  fetchCollaborationOffers,
+  fetchPartnerColleges,
+  HOME_TESTIMONIALS,
+  resolveCollaborationOffers,
+  resolvePartnerColleges,
+} from "@/lib/api/public-content";
 import { formatCalendarDateMedium } from "@/lib/format-calendar-date";
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const [featured, upcoming, partners, offers, testimonials] = await Promise.all([
+    const [featured, upcoming, partners, offers] = await Promise.all([
       fetchFeaturedEvents({ page: 0, size: 12 }).catch(() => [] as CollegeEvent[]),
       fetchUpcomingEvents({ page: 0, size: 12 }).catch(() => [] as CollegeEvent[]),
       fetchPartnerColleges().catch(() => []),
       fetchCollaborationOffers().catch(() => []),
-      fetchTestimonials().catch(() => []),
     ]);
-    return { featured, upcoming, partners, offers, testimonials };
+    return { featured, upcoming, partners, offers };
   },
   head: () => ({
     meta: [
@@ -28,7 +33,12 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { featured, upcoming, partners, offers, testimonials: voices } = Route.useLoaderData();
+  const { featured, upcoming, partners: apiPartners, offers: apiOffers } = Route.useLoaderData();
+  const partners = resolvePartnerColleges(apiPartners);
+  const offers = resolveCollaborationOffers(apiOffers);
+  const partnersAreDemo = apiPartners.length === 0;
+  const offersAreDemo = apiOffers.length === 0;
+  const voices = HOME_TESTIMONIALS;
 
   const categoryLabels = useMemo(() => {
     return Array.from(new Set([...featured.map((e) => e.category), ...upcoming.map((e) => e.category)]));
@@ -165,22 +175,24 @@ function HomePage() {
             <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Stronger together</p>
             <h2 className="font-display text-3xl md:text-4xl font-bold mb-3">Partner Colleges</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">We collaborate with India's top institutions to bring exclusive opportunities to our students.</p>
+            {partnersAreDemo ? (
+              <p className="text-sm text-muted-foreground mt-2">Sample partner institutions for demonstration.</p>
+            ) : null}
           </div>
-          {partners.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground">No partner colleges yet — submit a collaboration request.</p>
-          ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {partners.map(p => (
-              <div key={p.name} className="bg-card border border-border rounded-xl p-6 text-center hover:border-primary hover:shadow-card transition">
+            {partners.map((p) => (
+              <div key={p.id} className="bg-card border border-border rounded-xl p-6 text-center hover:border-primary hover:shadow-card transition">
                 <div className="h-14 w-14 mx-auto rounded-full bg-gradient-to-br from-primary to-gold flex items-center justify-center mb-3">
                   <GraduationCap className="h-7 w-7 text-primary-foreground" />
                 </div>
                 <h4 className="font-semibold text-sm mb-1">{p.name}</h4>
-                <p className="text-xs text-muted-foreground">{p.activeOffers} active offers</p>
+                <p className="text-xs text-muted-foreground">
+                  {[p.city, p.state].filter(Boolean).join(", ") || p.code}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{p.activeOffers} active offers</p>
               </div>
             ))}
           </div>
-          )}
         </div>
       </section>
 
@@ -201,8 +213,8 @@ function HomePage() {
               </Link>
             </div>
             <div className="space-y-3">
-              {offers.length === 0 ? (
-                <p className="text-sm opacity-70">No approved collaboration offers yet.</p>
+              {offersAreDemo ? (
+                <p className="text-sm opacity-70 mb-2">Sample collaboration perks for demonstration.</p>
               ) : null}
               {offers.map((o) => (
                 <div key={o.collaborationId} className="bg-white/5 border border-white/10 rounded-xl p-5 hover:border-primary/50 transition">
@@ -229,10 +241,8 @@ function HomePage() {
           <div className="text-center mb-12">
             <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Voices from campus</p>
             <h2 className="font-display text-3xl md:text-4xl font-bold">What students say</h2>
+            <p className="text-sm text-muted-foreground mt-2">Sample testimonials for demonstration.</p>
           </div>
-          {voices.length === 0 ? (
-            <p className="text-center text-muted-foreground">No testimonials in the database yet.</p>
-          ) : (
           <div className="grid md:grid-cols-3 gap-6">
             {voices.map((t) => (
               <div key={t.id} className="bg-card border border-border rounded-2xl p-7 shadow-card">
@@ -250,7 +260,6 @@ function HomePage() {
               </div>
             ))}
           </div>
-          )}
         </div>
       </section>
 

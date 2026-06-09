@@ -3,26 +3,35 @@ import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useState } from "react";
 import { Building2, Handshake, ArrowRight, CheckCircle2, GraduationCap, Sparkles } from "lucide-react";
 import { EVENT_IMAGES } from "@/lib/events-data";
-import { fetchCollaborationOffers, fetchPartnerColleges, submitCollaborationRequest } from "@/lib/api/public-content";
-import { fetchColleges } from "@/lib/api/colleges";
+import {
+  fetchCollaborationOffers,
+  fetchPartnerColleges,
+  resolveCollaborationOffers,
+  resolvePartnerColleges,
+  submitCollaborationRequest,
+} from "@/lib/api/public-content";
+
+/** Mandsaur University — default requester for collaboration requests on this portal. */
+const MU_REQUESTER_COLLEGE_ID = 1;
 
 export const Route = createFileRoute("/collaborate")({
   loader: async () => {
-    const [partners, offers, colleges] = await Promise.all([
+    const [partners, offers] = await Promise.all([
       fetchPartnerColleges().catch(() => []),
       fetchCollaborationOffers().catch(() => []),
-      fetchColleges().catch(() => []),
     ]);
-    return { partners, offers, colleges };
+    return { partners, offers };
   },
   head: () => ({ meta: [{ title: "Collaboration Portal — MU Events" }, { name: "description", content: "List your college's events on MU Events and collaborate with thousands of students." }] }),
   component: CollaboratePage,
 });
 
 function CollaboratePage() {
-  const { partners, offers, colleges } = Route.useLoaderData();
-  const firstId = colleges[0]?.id;
-  const [requesterCollegeId, setRequesterCollegeId] = useState(() => String(firstId ?? ""));
+  const { partners: apiPartners, offers: apiOffers } = Route.useLoaderData();
+  const partners = resolvePartnerColleges(apiPartners);
+  const offers = resolveCollaborationOffers(apiOffers);
+  const partnersAreDemo = apiPartners.length === 0;
+  const offersAreDemo = apiOffers.length === 0;
   const [partnerUniversityName, setPartnerUniversityName] = useState("");
   const [coordinatorName, setCoordinatorName] = useState("");
   const [coordinatorEmail, setCoordinatorEmail] = useState("");
@@ -42,7 +51,7 @@ function CollaboratePage() {
     setLoading(true);
     try {
       await submitCollaborationRequest({
-        requesterCollegeId: Number(requesterCollegeId),
+        requesterCollegeId: MU_REQUESTER_COLLEGE_ID,
         partnerUniversityName: partnerUniversityName.trim(),
         coordinatorName,
         coordinatorEmail,
@@ -102,21 +111,22 @@ function CollaboratePage() {
             <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Partnership requests</p>
             <h2 className="font-display text-3xl md:text-4xl font-bold">Featured Partner Colleges</h2>
             <p className="text-sm text-muted-foreground mt-2 max-w-xl mx-auto">
-              Universities that have submitted a collaboration request appear here.
+              {partnersAreDemo
+                ? "Sample partner institutions for demonstration — submit the form below to collaborate for real."
+                : "Universities with approved collaboration requests appear here."}
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {partners.length === 0 ? (
-              <p className="col-span-full text-center text-sm text-muted-foreground py-8">
-                No collaboration requests yet. Submit the form below to be listed.
-              </p>
-            ) : null}
             {partners.map((p) => (
-              <div key={p.id} className="bg-card border border-border rounded-xl p-6 text-center">
+              <div key={p.id} className="bg-card border border-border rounded-xl p-6 text-center hover:border-primary/40 hover:shadow-card transition">
                 <div className="h-12 w-12 mx-auto rounded-full bg-gradient-to-br from-primary to-gold flex items-center justify-center mb-3">
                   <GraduationCap className="h-6 w-6 text-primary-foreground" />
                 </div>
-                <h4 className="font-semibold text-sm">{p.name}</h4>
+                <h4 className="font-semibold text-sm mb-1">{p.name}</h4>
+                <p className="text-xs text-muted-foreground">
+                  {[p.city, p.state].filter(Boolean).join(", ") || p.code}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{p.activeOffers} active offers</p>
               </div>
             ))}
           </div>
@@ -136,25 +146,6 @@ function CollaboratePage() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-10 items-stretch">
             <div className="bg-card border border-border rounded-2xl shadow-card p-6 sm:p-8 flex flex-col">
                 <form className="space-y-4 flex-1" onSubmit={onSubmit}>
-                  {colleges.length === 0 ? (
-                    <p className="text-xs text-amber-700 dark:text-amber-500">Add your college in the system to submit a request.</p>
-                  ) : null}
-                  <div>
-                    <label htmlFor="collab-requester" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Your college *</label>
-                    <select
-                      id="collab-requester"
-                      value={requesterCollegeId}
-                      onChange={(e) => setRequesterCollegeId(e.target.value)}
-                      className="w-full mt-1.5 px-3 py-2.5 border border-input rounded-lg text-sm bg-background outline-none focus:border-primary"
-                      disabled={colleges.length === 0}
-                    >
-                      {colleges.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                   <div>
                     <label htmlFor="collab-partner-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Partner university *</label>
                     <input
@@ -169,15 +160,15 @@ function CollaboratePage() {
                   </div>
                   <div>
                     <label htmlFor="collab-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Coordinator name *</label>
-                    <input id="collab-name" required value={coordinatorName} onChange={(e) => setCoordinatorName(e.target.value)} placeholder="Dr. Ramesh Kumar" className="w-full mt-1.5 px-3 py-2.5 border border-input rounded-lg text-sm bg-background outline-none focus:border-primary" />
+                    <input id="collab-name" required value={coordinatorName} onChange={(e) => setCoordinatorName(e.target.value)} placeholder="e.g. Dr. Ramesh Kumar" className="w-full mt-1.5 px-3 py-2.5 border border-input rounded-lg text-sm bg-background outline-none focus:border-primary" />
                   </div>
                   <div>
                     <label htmlFor="collab-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Official email *</label>
-                    <input id="collab-email" required type="email" value={coordinatorEmail} onChange={(e) => setCoordinatorEmail(e.target.value)} placeholder="coordinator@college.edu" className="w-full mt-1.5 px-3 py-2.5 border border-input rounded-lg text-sm bg-background outline-none focus:border-primary" />
+                    <input id="collab-email" required type="email" value={coordinatorEmail} onChange={(e) => setCoordinatorEmail(e.target.value)} placeholder="coordinator@university.edu.in" className="w-full mt-1.5 px-3 py-2.5 border border-input rounded-lg text-sm bg-background outline-none focus:border-primary" />
                   </div>
                   <div>
                     <label htmlFor="collab-phone" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone *</label>
-                    <input id="collab-phone" required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 …" className="w-full mt-1.5 px-3 py-2.5 border border-input rounded-lg text-sm bg-background outline-none focus:border-primary" />
+                    <input id="collab-phone" required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91XXXXXXXXXX" className="w-full mt-1.5 px-3 py-2.5 border border-input rounded-lg text-sm bg-background outline-none focus:border-primary" />
                   </div>
                   <div>
                     <label htmlFor="collab-type" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Type of collaboration *</label>
@@ -205,7 +196,7 @@ function CollaboratePage() {
                   ) : null}
                   <button
                     type="submit"
-                    disabled={loading || colleges.length === 0}
+                    disabled={loading}
                     className="w-full bg-primary text-primary-foreground py-3.5 rounded-lg font-bold hover:opacity-90 disabled:opacity-60 mt-2"
                   >
                     {loading ? "Submitting..." : "Submit request"}
@@ -240,11 +231,11 @@ function CollaboratePage() {
           <div className="text-center mb-8">
             <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Live offers</p>
             <h2 className="font-display text-2xl md:text-3xl font-bold">Exclusive Collaboration Perks</h2>
+            {offersAreDemo ? (
+              <p className="text-sm text-muted-foreground mt-2">Sample perks for demonstration.</p>
+            ) : null}
           </div>
           <div className="space-y-3">
-            {offers.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center">No approved offers yet.</p>
-            ) : null}
             {offers.map((o) => (
               <div key={o.collaborationId} className="bg-card border border-border rounded-xl p-5">
                 <div className="flex items-start gap-3">

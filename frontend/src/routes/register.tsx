@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,7 @@ function RegisterPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [roleId, setRoleId] = useState<number>(1);
   const [collegeId, setCollegeId] = useState<number>(1);
   const [loading, setLoading] = useState(false);
@@ -82,6 +83,7 @@ function RegisterPage() {
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
+                placeholder="e.g. Rahul"
                 className="h-11"
               />
             </div>
@@ -92,6 +94,7 @@ function RegisterPage() {
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
+                placeholder="e.g. Sharma"
                 className="h-11"
               />
             </div>
@@ -104,15 +107,16 @@ function RegisterPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you.name@meu.edu.in"
               className="h-11"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone (optional, 10 digits)</Label>
+            <Label htmlFor="phone">Phone (optional)</Label>
             <Input
               id="phone"
-              inputMode="numeric"
-              placeholder="9876543210"
+              type="tel"
+              placeholder="+91XXXXXXXXXX"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="h-11"
@@ -120,16 +124,32 @@ function RegisterPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="reg-password">Password</Label>
-            <Input
-              id="reg-password"
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Strong password"
-              className="h-11"
-            />
+            <div className="relative">
+              <Input
+                id="reg-password"
+                type={showPassword ? "text" : "password"}
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min. 8 characters"
+                className="h-11 pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-11 px-3 hover:bg-transparent"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
               Upper & lower case, a number, and a special character (@$!%*?&). Minimum 8 characters.
             </p>
